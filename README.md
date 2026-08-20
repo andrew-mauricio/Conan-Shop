@@ -85,7 +85,7 @@ Conan-Api/Plugins/ConanShop/
 
 É o mesmo desenho, e de propósito. O que muda:
 
-| | ArkShop (ARK/ASA) | Conan Shop |
+| | ArkShop (ARK e ASA) | Conan Shop |
 |---|---|---|
 | ganhar pontos | por tempo, por grupo | **igual** |
 | ver a loja | `/shop` | `!shop` (configurável) |

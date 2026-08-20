@@ -4,7 +4,7 @@ Loja por pontos para Conan Exiles Enhanced. O jogador ganha pontos por tempo
 online, vê a lista com `!shop` e compra com `!comprar`. VIP ganha mais, e quem
 manda nisso é o seu `permission.json`.
 
-É o mesmo desenho do **ArkShop**, que muita gente já conhece do ARK/ASA —
+É o mesmo desenho do **ArkShop**, que muita gente já conhece do ARK e do ASA —
 adaptado ao Conan, que funciona diferente por dentro (veja
 [Um item não é uma blueprint](#um-item-não-é-uma-blueprint)).
 
