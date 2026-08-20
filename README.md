@@ -10,6 +10,9 @@ os mesmos comandos, adaptada ao Conan.*
 
 <img src=".github/imagens/loja.png" width="440">
 
+**[Manual completo](Docs/MANUAL.md)** · **[Compilar do fonte](src/COMPILAR.md)** ·
+**[Roteiro de teste](Docs/TESTE-COM-JOGADOR.md)** · **[Baixar](../../releases)**
+
 </div>
 
 ---
@@ -237,6 +240,18 @@ Não é "deve funcionar" — cada linha abaixo foi medida:
   100 pedras no inventário, e o crédito por tempo creditando durante o teste
 
 A bateria roda com `testes/rodar.sh`, sob Wine — o ambiente de verdade.
+
+---
+
+## Saber mais
+
+| | |
+|---|---|
+| **[Manual completo](Docs/MANUAL.md)** | cada chave do `config.json`, o que o plugin protege e o que ele **não** resolve |
+| **[Compilar do fonte](src/COMPILAR.md)** | só o mingw-w64; e como conferir que o DLL publicado veio deste código |
+| **[Roteiro de teste](Docs/TESTE-COM-JOGADOR.md)** | o que testar dentro do jogo, em ordem, e o que cada falha significa |
+| **[Conan-Api](https://github.com/andrew-mauricio/Conan-Api)** | a API que este plugin usa — instale-a primeiro |
+| **[Conan-Api-SDK](https://github.com/andrew-mauricio/Conan-Api-SDK)** | para escrever o seu próprio plugin |
 
 ---
 
