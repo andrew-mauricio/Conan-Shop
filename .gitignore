@@ -1,0 +1,19 @@
+# Segredo. Nunca, em hipótese alguma.
+.env
+*.token
+.git-credentials
+*.pem
+
+# Gerado em execução: os pontos dos jogadores do SEU servidor.
+*.db
+*.db-wal
+*.db-shm
+*.log
+
+# Artefato de build.
+build/
+pacote/
+*.o
+*.obj
+*.dll
+*.exe
