@@ -31,7 +31,9 @@
 
 namespace
 {
-    sqlite3*   g_db = nullptr;
+    sqlite3*    g_db = nullptr;
+    // O caminho do banco, para cada thread abrir a PROPRIA conexao.
+    std::string g_caminho;
     std::mutex g_trava;
 
     // Exatamente o padrao do ArkShop: le o saldo, decide em C++, e so' entao
@@ -51,12 +53,12 @@ namespace
     // exatamente o caso real que importa: dois servidores de jogo apontando
     // para o MESMO MySQL, cada um com seu processo, sem mutex nenhum entre
     // eles. E' para esse caso que a condicao mora dentro do UPDATE.
-    bool DebitarIngenuo(const char* jogador, int64_t quanto)
+    bool DebitarIngenuo(sqlite3* db, const char* jogador, int64_t quanto)
     {
         int64_t saldo = 0;
         {
             sqlite3_stmt* st = nullptr;
-            if (sqlite3_prepare_v2(g_db, "SELECT pontos FROM carteira WHERE jogador=?1;",
+            if (sqlite3_prepare_v2(db, "SELECT pontos FROM carteira WHERE jogador=?1;",
                                    -1, &st, nullptr) != SQLITE_OK) return false;
             sqlite3_bind_text(st, 1, jogador, -1, SQLITE_TRANSIENT);
             if (sqlite3_step(st) == SQLITE_ROW) saldo = sqlite3_column_int64(st, 0);
@@ -74,7 +76,7 @@ namespace
 
         {
             sqlite3_stmt* st = nullptr;
-            if (sqlite3_prepare_v2(g_db,
+            if (sqlite3_prepare_v2(db,
                     "UPDATE carteira SET pontos = pontos - ?1 WHERE jogador=?2;",
                     -1, &st, nullptr) != SQLITE_OK) return false;
             sqlite3_bind_int64(st, 1, quanto);
@@ -93,14 +95,14 @@ namespace
     // A condicao de saldo vai DENTRO do UPDATE, e quem decide e' o banco, uma
     // vez, sob a trava dele. Nao ha o que ler antes, entao nao ha fresta entre
     // ler e gastar.
-    bool DebitarComCondicao(const char* jogador, int64_t quanto)
+    bool DebitarComCondicao(sqlite3* db, const char* jogador, int64_t quanto)
     {
         // A mesma pausa da versao ingenua, no mesmo lugar da linha do tempo:
         // sem ela a comparacao seria entre uma corrida apertada e uma frouxa.
         std::this_thread::sleep_for(std::chrono::microseconds(50));
 
         sqlite3_stmt* st = nullptr;
-        if (sqlite3_prepare_v2(g_db,
+        if (sqlite3_prepare_v2(db,
                 "UPDATE carteira SET pontos = pontos - ?1 "
                 "WHERE jogador=?2 AND pontos >= ?1;",
                 -1, &st, nullptr) != SQLITE_OK) return false;
@@ -113,13 +115,14 @@ namespace
         if (rc != SQLITE_DONE) return false;
 
         // "Alterou uma linha" e' a resposta do banco a pergunta "havia saldo?".
-        return sqlite3_changes(g_db) == 1;
+        return sqlite3_changes(db) == 1;
     }
 }
 
 int main(int argc, char** argv)
 {
     const std::string caminho = (argc > 1) ? argv[1] : "controle_positivo.db";
+    g_caminho = caminho;
     std::remove(caminho.c_str());
     std::remove((caminho + "-wal").c_str());
     std::remove((caminho + "-shm").c_str());
@@ -148,9 +151,38 @@ int main(int argc, char** argv)
         for (int t = 0; t < 8; ++t)
             ths.emplace_back([&, ingenuo]
             {
+                // ── UMA CONEXAO POR THREAD ──────────────────────────────────
+                //
+                // O comentario no topo desta funcao sempre disse "cada thread e'
+                // um CLIENTE independente do banco". O codigo nao fazia isso:
+                // as oito compartilhavam `g_db`.
+                //
+                // Isso importa por causa de UMA linha, `sqlite3_changes(db)`,
+                // que responde "quantas linhas a ULTIMA operacao DESTA CONEXAO
+                // mudou". Com a conexao compartilhada, a thread A podia ler o
+                // `changes` que a thread B acabou de produzir — e contar como
+                // sucesso um UPDATE que nao foi dela.
+                //
+                // O sintoma era INTERMITENTE e enganoso: em 20/08/2026 a
+                // bateria reprovou 1 vez em ~10, sempre aqui, com
+                //     passaram=19   saldo=0
+                // que e' uma contradicao — 19 compras de 10 sobre 200 deixariam
+                // saldo 10, e saldo 0 significa que 20 passaram. O BANCO estava
+                // certo; o contador do teste e' que se perdeu. Um instrumento
+                // que erra as vezes reprova codigo bom e ensina a ignora-lo.
+                //
+                // Com uma conexao por thread, `changes` volta a responder sobre
+                // o que ESTA thread fez — e o teste passa a medir o que diz que
+                // mede, que e' tambem o caso real: dois servidores de jogo, dois
+                // processos, duas conexoes, nenhum mutex entre eles.
+                sqlite3* db = nullptr;
+                if (sqlite3_open_v2(g_caminho.c_str(), &db,
+                                    SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) return;
+                sqlite3_busy_timeout(db, 5000);
                 for (int i = 0; i < 50; ++i)
-                    if (ingenuo ? DebitarIngenuo("corrida", 10)
-                                : DebitarComCondicao("corrida", 10)) ++ok;
+                    if (ingenuo ? DebitarIngenuo(db, "corrida", 10)
+                                : DebitarComCondicao(db, "corrida", 10)) ++ok;
+                sqlite3_close(db);
             });
         for (auto& t : ths) t.join();
 

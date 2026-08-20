@@ -23,11 +23,20 @@
 // O dono escreve linhas em  Conan-Api/SHOP-COMANDOS  e o plugin, no proximo
 // despertar (a cada 3 s), executa e RESPONDE em  Conan-Api/SHOP-RESPOSTAS.
 //
-//     dar     <jogador> <quantidade> [motivo]
-//     tirar   <jogador> <quantidade> [motivo]
-//     definir <jogador> <quantidade> [motivo]
-//     saldo   <jogador>
+//     dar        <jogador> <quantidade> [motivo]
+//     tirar      <jogador> <quantidade> [motivo]
+//     definir    <jogador> <quantidade> [motivo]
+//     saldo      <jogador>
+//     grupo      <jogador> <grupo> [dias]     <- VIP, pelo Permission
+//     tirargrupo <jogador> <grupo>
 //     recarregar
+//
+// `grupo` e `tirargrupo` chamam o Permission, e valem para QUALQUER grupo do
+// permission.json — nao so' os que dao pontos. Existem aqui porque o Permission
+// nao tem porta de fora: quem quisesse dar VIP por script precisaria de um
+// plugin so' para chamar a ABI dele, ou de mexer no banco a mao (com WAL e
+// cache em memoria, e' pedir para corromper). O `dias` opcional e' como se
+// vende VIP de verdade: `grupo Fulano#1 vip 30`.
 //
 // O <jogador> pode ser o id da conta (o que o Permission usa) ou o nome de
 // exibicao de quem esta online — resolvido na hora. Nome so' funciona com o

@@ -91,6 +91,7 @@ executar() {   # $1 = exe, $2... = argumentos
 }
 
 FALHOU=0
+NAO_CONFERI=0
 set +e
 # Cada teste quer um argumento diferente, e passar o errado faz o teste
 # reprovar por motivo que nao e' o dele — aconteceu aqui: o teste_config
@@ -104,7 +105,37 @@ for t in controle_positivo teste_pontos teste_config teste_texto; do
         teste_texto)  executar "$t.exe"     ;;    # nao usa argumento
         *)            executar "$t.exe" "$t.db" ;;
     esac
-    if [ $? -eq 0 ]; then echo "   -> passou"; else echo "   -> FALHOU"; FALHOU=1; fi
+    rc=$?
+    # ── REPROVOU x NAO CONSEGUI RODAR ───────────────────────────────────────
+    #
+    # A versao anterior fazia `else FALHOU=1` — qualquer codigo diferente de
+    # zero virava REPROVADO. So' que os testes devolvem 1 quando reprovam, e
+    # tudo o mais vem de FORA deles:
+    #
+    #   124  o `timeout 300` estourou
+    #   125  o docker nao conseguiu executar
+    #   126  o binario nao e' executavel
+    #   127  nao achou o comando (wine sumiu?)
+    #   137  morto por sinal (OOM, kill)
+    #
+    # Isso importa porque estes testes rodam DENTRO do container do servidor de
+    # jogo, compartilhando o wineserver com o Conan. Com o servidor sob carga,
+    # o wine as vezes nao responde — e a bateria dizia "REPROVADA", mandando
+    # procurar um defeito que nao existe.
+    #
+    # Medido em 20/08/2026: 1 reprovacao em ~10 rodadas, sem nenhuma alteracao
+    # de codigo entre elas. Um teste que reprova as vezes e' pior que um que
+    # reprova sempre: ensina a ignorar a reprovacao.
+    #
+    # Agora: 0 = passou · 1 = REPROVOU de verdade · resto = NAO CONFERI, que
+    # nao e' aprovacao nem reprovacao.
+    case $rc in
+        0) echo "   -> passou" ;;
+        1) echo "   -> REPROVOU"; FALHOU=1 ;;
+        *) echo "   -> NAO CONSEGUI RODAR (codigo $rc — timeout, docker ou wine)."
+           echo "      Isto NAO e' reprovacao, e tambem NAO e' aprovacao."
+           NAO_CONFERI=1 ;;
+    esac
 done
 set -e
 
@@ -128,9 +159,15 @@ if [ "$RODAR" = "container" ]; then
 fi
 
 echo
-if [ "$FALHOU" = "0" ]; then
-    echo "  ✅ bateria completa APROVADA (rodada: $RODAR)"
-else
+if [ "$FALHOU" != "0" ]; then
     echo "  ❌ bateria REPROVADA"
+    exit 1
 fi
-exit $FALHOU
+if [ "$NAO_CONFERI" != "0" ]; then
+    echo "  ⚠  NAO CONSEGUI CONFERIR tudo (algum teste nao rodou)."
+    echo "     Isto NAO e' aprovacao. Tente de novo com o servidor mais calmo,"
+    echo "     ou rode com wine local em vez do container."
+    exit 2
+fi
+echo "  ✅ bateria completa APROVADA (rodada: $RODAR)"
+exit 0

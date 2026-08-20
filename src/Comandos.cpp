@@ -27,6 +27,28 @@ namespace
 {
     std::string g_fila, g_respostas;
 
+    // ── O QUE FICOU PARA CONFIRMAR NA PROXIMA PASSADA ───────────────────────
+    //
+    // A escrita do Permission e' ASSINCRONA: `conceder` poe a tarefa na fila da
+    // thread escritora dele e devolve 1 se conseguiu ENFILEIRAR. A validacao do
+    // grupo acontece depois, la' dentro.
+    //
+    // A primeira versao tratou esse 1 como sucesso e respondeu
+    // "ok grupo A-4QR7CRS0F -> naoexiste" para um grupo que NAO EXISTE. O
+    // Permission fez tudo certo (recusou e logou "conceder ignorado: grupo
+    // 'naoexiste' nao existe") — foi a MINHA resposta que mentiu.
+    //
+    // Agora o resultado e' PERGUNTADO depois, com `no_grupo`, na passada
+    // seguinte da fila (3 s). Quem le' SHOP-RESPOSTAS ve' primeiro
+    // "enfileirado" e, um instante depois, "CONFIRMADO" ou "NAO ENTROU".
+    struct Pendente
+    {
+        int         linha;
+        std::string jogador, grupo;
+        bool        esperado;      // true = deve estar no grupo; false = deve ter saido
+    };
+    std::vector<Pendente> g_pendentes;
+
     void Aparar(std::string& s)
     {
         while (!s.empty() && (s.back()  == '\r' || s.back()  == '\n' ||
@@ -82,12 +104,73 @@ void DefinirCaminhos(const std::string& raiz)
 const std::string& CaminhoDaFila()      { return g_fila; }
 const std::string& CaminhoDasRespostas(){ return g_respostas; }
 
+// Confirma, com o Permission, o que ficou pendente da passada anterior.
+// Devolve as linhas de resposta — que sao ACRESCENTADAS ao arquivo, para quem
+// automatiza ler o desfecho de cada pedido.
+static std::vector<std::string> ConfirmarPendentes()
+{
+    std::vector<std::string> saida;
+    if (g_pendentes.empty()) return saida;
+
+    const ConanPermApi* perm = ConanPermObter();
+    for (const Pendente& d : g_pendentes)
+    {
+        char linha[512];
+        if (!perm || !perm->no_grupo)
+        {
+            std::snprintf(linha, sizeof(linha),
+                "linha %d: NAO CONFERI %s -> %s (o Permission sumiu no meio)",
+                d.linha, d.jogador.c_str(), d.grupo.c_str());
+        }
+        else
+        {
+            const int32_t esta = perm->no_grupo(d.jogador.c_str(), d.grupo.c_str());
+            const bool ok = (esta == 1) == d.esperado;
+            if (ok)
+                std::snprintf(linha, sizeof(linha), "linha %d: CONFIRMADO %s %s %s",
+                              d.linha, d.jogador.c_str(),
+                              d.esperado ? "esta em" : "saiu de", d.grupo.c_str());
+            else if (esta < 0)
+                std::snprintf(linha, sizeof(linha),
+                    "linha %d: NAO CONFERI %s -> %s (o Permission nao respondeu)",
+                    d.linha, d.jogador.c_str(), d.grupo.c_str());
+            else
+                std::snprintf(linha, sizeof(linha),
+                    "linha %d: NAO ENTROU — %s NAO esta em \"%s\". O grupo existe no "
+                    "permission.json? As chaves diferenciam maiusculas (\"vip\" nao e' \"VIP\"). "
+                    "O motivo exato esta no log, procure por [permission].",
+                    d.linha, d.jogador.c_str(), d.grupo.c_str());
+        }
+        saida.push_back(linha);
+        if (const ConanApiTabela* api = ApiDaLoja()) api->Log("[shop] fila: %s", linha);
+    }
+    g_pendentes.clear();
+    return saida;
+}
+
 void AtenderFila()
 {
     if (g_fila.empty()) return;
 
+    // As confirmacoes vem ANTES do retorno por falta de arquivo: o pedido foi
+    // na passada passada, e o desfecho tem de sair mesmo que ninguem escreva
+    // nada novo agora.
+    const std::vector<std::string> confirmacoes = ConfirmarPendentes();
+
     FILE* f = std::fopen(g_fila.c_str(), "rb");
-    if (!f) return;                       // ninguem pediu nada: o caso comum
+    if (!f)
+    {
+        if (confirmacoes.empty()) return;   // o caso comum: nada a fazer
+        // So' confirmacoes: ACRESCENTA ao arquivo de respostas, para nao apagar
+        // o "enfileirado" que o dono acabou de ler.
+        FILE* r = std::fopen(g_respostas.c_str(), "ab");
+        if (r)
+        {
+            for (const std::string& c : confirmacoes) std::fprintf(r, "%s\n", c.c_str());
+            std::fclose(r);
+        }
+        return;
+    }
 
     std::string todo;
     {
@@ -105,7 +188,7 @@ void AtenderFila()
     std::remove(g_fila.c_str());
 
     const ConanApiTabela* api = ApiDaLoja();
-    std::vector<std::string> respostas;
+    std::vector<std::string> respostas = confirmacoes;
     int linhaN = 0;
 
     size_t ini = 0;
@@ -145,7 +228,8 @@ void AtenderFila()
         if (p.size() < 2)
         {
             std::snprintf(resp, sizeof(resp),
-                "linha %d: ERRO \"%s\" — falta o jogador. Use: dar|tirar|definir|saldo <jogador> [quantidade]",
+                "linha %d: ERRO \"%s\" — falta o jogador. Use: "
+                "dar|tirar|definir <jogador> <qtd> · saldo <jogador> · grupo <jogador> <grupo>",
                 linhaN, verbo.c_str());
             respostas.push_back(resp);
             continue;
@@ -156,6 +240,91 @@ void AtenderFila()
         {
             std::snprintf(resp, sizeof(resp), "linha %d: ERRO \"%s\" — %s",
                           linhaN, p[1].c_str(), porque.c_str());
+            respostas.push_back(resp);
+            continue;
+        }
+
+        // ── grupo/tirargrupo: administrar VIP de fora do jogo ───────────────
+        //
+        // POR QUE ISTO MORA AQUI, E NAO NO Permission
+        //
+        // O Permission expoe `conceder`/`revogar` na ABI dele, mas nao tem
+        // porta de fora: quem quisesse dar VIP precisava de um plugin so' para
+        // chamar a funcao, ou de reiniciar o servidor depois de mexer no banco
+        // a mao — e mexer no banco de outro plugin, com WAL e cache em memoria,
+        // e' pedir para corromper.
+        //
+        // O ConanShop ja' linka o Permission (precisa dele para VIP e para a
+        // identidade) e ja' tem uma fila que painel web, script e SSH sabem
+        // escrever. Acrescentar dois verbos aqui custa 30 linhas e resolve.
+        //
+        // Vale para QUALQUER grupo do permission.json, nao so' os que dao
+        // pontos: quem criar um grupo "patrono" ou "construtor" administra por
+        // aqui do mesmo jeito.
+        if (verbo == "grupo" || verbo == "tirargrupo")
+        {
+            if (p.size() < 3)
+            {
+                std::snprintf(resp, sizeof(resp),
+                    "linha %d: ERRO \"%s\" — falta o grupo. Use: %s <jogador> <grupo>",
+                    linhaN, verbo.c_str(), verbo.c_str());
+                respostas.push_back(resp);
+                continue;
+            }
+            const ConanPermApi* perm = ConanPermObter();
+            if (!perm)
+            {
+                std::snprintf(resp, sizeof(resp),
+                    "linha %d: ERRO \"%s\" — o ConanPermission.dll nao esta carregado",
+                    linhaN, verbo.c_str());
+                respostas.push_back(resp);
+                continue;
+            }
+
+            // `expira_em` = 0 significa nunca. Um quarto campo, se vier, sao os
+            // DIAS de duracao — que e' como se vende VIP de verdade.
+            int64_t expira = 0;
+            if (verbo == "grupo" && p.size() >= 4)
+            {
+                char* fimD = nullptr;
+                const long long dias = std::strtoll(p[3].c_str(), &fimD, 10);
+                if (fimD && *fimD == 0 && dias > 0)
+                    expira = int64_t(std::time(nullptr)) + dias * 86400;
+            }
+
+            const int32_t r = (verbo == "grupo")
+                ? (perm->conceder ? perm->conceder(id.c_str(), p[2].c_str(),
+                                                   expira, "fila do ConanShop") : -1)
+                : (perm->revogar  ? perm->revogar (id.c_str(), p[2].c_str(),
+                                                   "fila do ConanShop") : -1);
+
+            // 1 e' "ACEITO PARA GRAVAR", nao "gravado" — ver ConfirmarPendentes.
+            if (r == 1)
+            {
+                g_pendentes.push_back({ linhaN, id, p[2], verbo == "grupo" });
+                if (expira)
+                    std::snprintf(resp, sizeof(resp),
+                        "linha %d: enfileirado %s %s -> %s (por %s dia(s)); confirmo em ate' 3 s",
+                        linhaN, verbo.c_str(), id.c_str(), p[2].c_str(), p[3].c_str());
+                else
+                    std::snprintf(resp, sizeof(resp),
+                        "linha %d: enfileirado %s %s -> %s; confirmo em ate' 3 s",
+                        linhaN, verbo.c_str(), id.c_str(), p[2].c_str());
+            }
+            else if (r == 0)
+                // A dica das MAIUSCULAS nao e' enfeite: as chaves de grupo sao
+                // comparadas exatamente como estao no permission.json, entao
+                // "VIP" e' recusado onde "vip" passa. Sem esta linha, quem
+                // digita o nome certo com a caixa errada le' "nao existe" e vai
+                // procurar o grupo que esta' bem ali.
+                std::snprintf(resp, sizeof(resp),
+                    "linha %d: RECUSADO %s — nao existe grupo \"%s\" no permission.json. "
+                    "Confira a caixa: as chaves diferenciam maiusculas (\"vip\" nao e' \"VIP\").",
+                    linhaN, verbo.c_str(), p[2].c_str());
+            else
+                std::snprintf(resp, sizeof(resp),
+                    "linha %d: ERRO %s — o Permission nao respondeu (a escrita e' enfileirada; "
+                    "confira o log dele)", linhaN, verbo.c_str());
             respostas.push_back(resp);
             continue;
         }
@@ -252,7 +421,8 @@ void AtenderFila()
         else
         {
             std::snprintf(resp, sizeof(resp),
-                "linha %d: ERRO verbo \"%s\" nao existe. Use: dar, tirar, definir, saldo, recarregar",
+                "linha %d: ERRO verbo \"%s\" nao existe. Use: dar, tirar, definir, saldo, "
+                "grupo, tirargrupo, recarregar",
                 linhaN, verbo.c_str());
         }
         respostas.push_back(resp);
