@@ -1,6 +1,6 @@
 <div align="center">
 
-# Conan Shop — points and shop plugin for Conan Exiles Enhanced servers
+# Conan Shop, points and shop plugin for Conan Exiles Enhanced servers
 
 **A server-side shop plugin for privately operated Conan Exiles Enhanced
 dedicated servers.** Players earn points for time online, open the catalogue
@@ -10,7 +10,7 @@ Runs entirely on the server, as a native plugin for
 **[Conan-Api](https://github.com/andrew-mauricio/Conan-Api)**. Players connect
 with an unmodified client and download nothing.
 
-*If you know **ArkShop** or **AsaShop** from ARK — same idea, same commands,
+*If you know **ArkShop** or **AsaShop** from ARK, same idea, same commands,
 adapted to how Conan Exiles actually identifies items.*
 
 <img src=".github/imagens/loja.png" width="440" alt="Conan Exiles shop plugin catalogue shown in the in-game message box">
@@ -38,7 +38,7 @@ want, they type `!shop`, see what is on offer, and buy.
 ```
 
 **For you, the server operator:** install one folder, edit one file. Who earns
-what, what is sold and for how much — all in `config.json`.
+what, what is sold and for how much, all in `config.json`.
 
 <table>
 <tr>
@@ -71,12 +71,12 @@ what, what is sold and for how much — all in `config.json`.
    ```
 4. Start the server
 
-That is all. The points database is created on first run, next to the plugin.
+That's all. The points database is created on first run, next to the plugin.
 
 > **Requires [Conan-Api](https://github.com/andrew-mauricio/Conan-Api)
 > installed**, together with the **Permission** plugin that ships with it.
-> Permission provides stable player identity — the key the wallet is stored
-> under — and the notion of VIP.
+> Permission provides stable player identity, the key the wallet is stored
+> under, and the notion of VIP.
 
 The folder ends up looking like this, and that is the whole of it:
 
@@ -107,20 +107,20 @@ Same design, deliberately. What differs:
 
 ### Two differences that matter
 
-**1. An item is not a blueprint.** In ARK, "one blueprint = one item" holds. In
-Conan it does not: Stone (`10001`) and Brimstone (`14171`) share **the same**
+**1. An item isn't a blueprint.** In ARK, "one blueprint = one item" holds. In
+Conan it doesn't: Stone (`10001`) and Brimstone (`14171`) share **the same**
 `ItemClass` (`/Script/ConanSandbox.GameItem`). Hundreds of simple items share
-that one native class — only the **Template ID** tells them apart.
+that one native class, only the **Template ID** tells them apart.
 
 A shop modelled the ARK way would deliver the wrong item for that entire family,
-**successfully**, without a single error in the log. That is why everything here
+**successfully**, without a single error in the log. That's why everything here
 is keyed on `template_id`.
 
-**2. There is no RCON command.** Conan's RCON accepts a fixed list of commands
-and does not register new ones — measured, not assumed. Riding along on
-`broadcast` does not work either: five hooks were armed simultaneously, the
+**2. There's no RCON command.** Conan's RCON accepts a fixed list of commands
+and doesn't register new ones, measured, not assumed. Riding along on
+`broadcast` doesn't work either: five hooks were armed simultaneously, the
 server replied *"Message has been broadcast."*, and **none of them fired**. The
-RCON path is native and does not go through the engine's reflection.
+RCON path is native and doesn't go through the engine's reflection.
 
 Two paths that do work, instead:
 
@@ -171,7 +171,7 @@ The file is commented inline. What you will actually change:
 }
 ```
 
-With the defaults, a regular player earns **60 points per hour**. That is the
+With the defaults, a regular player earns **60 points per hour**. That's the
 yardstick for reading prices. `"somar": false` grants the **highest** value among
 the player's groups (a VIP who is also in `default` earns 15, not 20).
 
@@ -186,8 +186,8 @@ the player's groups (a VIP who is also in `default` earns 15, not 20).
 ```
 
 The key (`stone`) is what the player types: `!comprar stone`.
-`"permissao": "shop.vip"` restricts an item — and it will not even appear in the
-catalogue of players who cannot buy it.
+`"permissao": "shop.vip"` restricts an item, and it won't even appear in the
+catalogue of players who can't buy it.
 
 **120 items ship configured**, across 10 categories, picked from the 9,121 the
 game exposes. The prices are a starting point; tune them.
@@ -212,7 +212,7 @@ itemtable-conan.csv      for spreadsheets (UTF-8 BOM, so Excel gets accents righ
 
 On build `24784646` that is **9,121 rows × 120 columns**: name, category, tier,
 DLC, stack size, class. It extracts the complete ItemTable exposed by that server
-build, read through the engine's own DataTable accessors — it does not depend on
+build, read through the engine's own DataTable accessors, it doesn't depend on
 anyone having opened a chest, because it reads the table rather than loaded
 objects.
 
@@ -220,10 +220,10 @@ objects.
 
 ## What it protects, and how
 
-### Nobody spends what they do not have, and nobody spends twice
+### Nobody spends what they don't have, and nobody spends twice
 
 The debit is **a single UPDATE with the balance condition inside it**. The
-database decides, under its own lock — there is no window between "read the
+database decides, under its own lock, there's no window between "read the
 balance" and "spend it", because the balance is never read first.
 
 Measured: 8 concurrent clients, 400 attempts competing for exactly 20 affordable
@@ -237,16 +237,16 @@ purchases.
 This matters concretely when two servers point at the same MySQL, where no lock
 is shared between the processes.
 
-### A broken config does not replace a working one
+### A broken config doesn't replace a working one
 
 You edit `config.json` at 9pm, miss a comma, and run `!shopreload`. The plugin
 **refuses it** and keeps the previous configuration, saying why. Without that,
-the shop would go empty at peak hours with no visible error — because "zero
+the shop would go empty at peak hours with no visible error, because "zero
 items" is a valid state.
 
 ### If delivery fails, the points come back
 
-And it is recorded in the ledger, with the reason. When a player says *"I bought
+And it's recorded in the ledger, with the reason. When a player says *"I bought
 it and never got it"*, the ledger answers.
 
 ---
@@ -255,7 +255,7 @@ it and never got it"*, the ledger answers.
 
 This plugin is a native DLL running **inside the dedicated server process, with
 that process's privileges**. So is every other plugin on the server — Conan-Api
-does not sandbox plugins from each other.
+doesn't sandbox plugins from each other.
 
 Practical consequences for you as the operator:
 
@@ -264,7 +264,7 @@ Practical consequences for you as the operator:
 - A bug in any native plugin, including this one, can crash the server.
 - Install what you trust. This plugin's full source is in
   [`src/`](src/), including its tests, and the published binary is
-  reproducible — see [Build from source](src/COMPILAR.md).
+  reproducible, see [Build from source](src/COMPILAR.md).
 
 ---
 
@@ -274,13 +274,13 @@ Not "should work" — each line below was measured:
 
 - wallet and atomic debit, with a **positive control** proving the test can fail
 - `config.json`: 8 cases, including valid JSON containing invalid items
-- command routing: 11 cases (`!shop` does not swallow `!shopreload`)
+- command routing: 11 cases (`!shop` doesn't swallow `!shopreload`)
 - command file: 10 cases, including the ones that must be refused
 - **and with a real player in game**: `!pontos`, `!shop` drawing the message box,
   `!comprar` delivering 100 stone into the inventory, and timed points crediting
   during the session
 
-The suite runs with `src/testes/rodar.sh`, under Wine — the real environment.
+The suite runs with `src/testes/rodar.sh`, under Wine, the real environment.
 Exit code 0 means passed, 1 means a real failure, and 2 means *could not verify*,
 which is neither.
 
@@ -290,12 +290,12 @@ which is neither.
 
 **Conan Shop (this repository) is MIT.** Fork it, modify it, ship it, sell it.
 
-The **[SDK](https://github.com/andrew-mauricio/Conan-Api-SDK)** it is built with
-is MIT too — nothing from the runtime is linked into your binary.
+The **[SDK](https://github.com/andrew-mauricio/Conan-Api-SDK)** it's built with
+is MIT too, nothing from the runtime is linked into your binary.
 
 The **[Conan-Api runtime](https://github.com/andrew-mauricio/Conan-Api)** has its
 own, more restrictive licence: run it on as many servers as you like, including
-servers that charge players, but do not resell or re-host the API itself.
+servers that charge players, but don't resell or re-host the API itself.
 
 Full text in [LICENSE](LICENSE).
 
@@ -313,7 +313,7 @@ Full text in [LICENSE](LICENSE).
 
 <div align="center">
 
-**Conan Shop is an independent, community-developed project. It is not
+**Conan Shop is an independent, community-developed project. It isn't
 affiliated with, endorsed by, sponsored by, or supported by Funcom or Inflexion
 Games.**
 
