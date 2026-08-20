@@ -1,21 +1,22 @@
-// Texto — as duas funções que mexem no que o jogador digita e no que ele lê.
+// Texto (text) — the two functions that handle what the player types and what
+// they read.
 //
-// POR QUE ELAS MORAM NUM HEADER PRÓPRIO
-// --------------------------------------
-// Estavam dentro do ConanShop.cpp, como `static`, e portanto FORA do alcance de
-// qualquer teste. As duas são pequenas e parecem óbvias — que é exatamente o
-// perfil do código que ninguém testa e que quebra em silêncio:
+// WHY THEY LIVE IN THEIR OWN HEADER
+// ----------------------------------
+// They used to sit inside ConanShop.cpp as `static`, and therefore out of reach
+// of any test. Both are small and look obvious, which is exactly the profile of
+// code nobody tests and that breaks silently:
 //
-//   · `Prefixo` decide qual comando atende. Se ele deixar `!shop` casar com
-//     `!shopreload`, o recarregamento vira uma listagem de loja e o dono nunca
-//     entende por que o config não atualiza.
-//   · `Formatar` monta o que o jogador lê. Se ele errar, o jogador vê
-//     "Voce tem {0} pontos" — feio, mas pior: ele NÃO pode virar printf, porque
-//     o texto vem do arquivo do dono, e um "%s" digitado por engano lá viraria
-//     leitura de memória arbitrária aqui dentro.
+//   · `Prefixo` decides which command answers. If it lets `!shop` match
+//     `!shopreload`, a reload turns into a shop listing and the owner never
+//     works out why the config won't update.
+//   · `Formatar` builds what the player reads. If it gets it wrong the player
+//     sees "You have {0} points" — ugly, but worse: it must NOT become printf,
+//     because the text comes from the owner's file, and a "%s" typed there by
+//     accident would turn into an arbitrary memory read in here.
 //
-// São `inline` num header para o plugin e o teste compilarem exatamente o mesmo
-// código — não uma cópia parecida.
+// They're `inline` in a header so the plugin and the tests compile exactly the
+// same code, not a similar copy.
 #pragma once
 
 #include <string>
@@ -25,8 +26,9 @@
 
 namespace Shop
 {
-    // Troca {0}, {1}, {2}… pelos valores, na ordem. O que não for um número
-    // entre chaves fica como está: `{nome}` é texto do dono, não placeholder.
+    // Replaces {0}, {1}, {2}… with the values, in order. Anything that isn't a
+    // number in braces is left alone: `{name}` is the owner's text, not a
+    // placeholder.
     inline std::string Formatar(const std::string& modelo,
                                 const std::vector<std::string>& valores)
     {
@@ -45,22 +47,23 @@ namespace Shop
             if (!numero) { r += modelo[i]; continue; }
 
             const size_t n = static_cast<size_t>(std::atoi(dentro.c_str()));
-            // Índice além do que foi passado vira vazio, não "{7}" nem lixo:
-            // uma mensagem do dono citando um valor que não existe é erro dele,
-            // e mostrar a chave crua ao jogador não ajuda ninguém.
+            // An index past what was passed becomes empty, not "{7}" and not
+            // garbage: a message from the owner citing a value that doesn't
+            // exist is their mistake, and showing the raw key to the player
+            // helps nobody.
             if (n < valores.size()) r += valores[n];
             i = fim;
         }
         return r;
     }
 
-    // `texto` começa com o comando `cmd`? Devolve o resto já aparado.
+    // Does `texto` start with the command `cmd`? Returns the rest, trimmed.
     //
-    // A REGRA QUE FAZ ISTO NÃO SER UM `starts_with`: depois do comando tem de
-    // vir um ESPAÇO ou o fim da linha. Sem isso, `!shop` casaria com
-    // `!shopreload` e com `!shopdar`, e o comando mais curto engoliria todos os
-    // outros — silenciosamente, porque a listagem da loja é uma resposta
-    // plausível.
+    // THE RULE THAT KEEPS THIS FROM BEING A `starts_with`: what follows the
+    // command must be a SPACE or the end of the line. Without that, `!shop`
+    // would match `!shopreload` and `!shopdar`, and the shortest command would
+    // swallow all the others — silently, because a shop listing is a plausible
+    // answer.
     inline bool Prefixo(const std::string& texto, const std::string& cmd,
                         std::string& resto)
     {

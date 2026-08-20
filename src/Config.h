@@ -1,23 +1,23 @@
-// Config — o config.json, lido e VALIDADO antes de valer.
+// Config — the config.json, read and VALIDATED before it takes effect.
 //
-// A REGRA QUE ESTE ARQUIVO EXISTE PARA GARANTIR
-// ----------------------------------------------
-// Uma configuracao so' substitui a anterior se estiver INTEIRA e correta. Nunca
-// pela metade.
+// THE RULE THIS FILE EXISTS TO GUARANTEE
+// ---------------------------------------
+// A configuration only replaces the previous one if it is WHOLE and correct.
+// Never halfway.
 //
-// O modo de falha que isso evita e' concreto: o dono edita o config as 21h,
-// erra uma virgula, manda !shopreload, e a loja fica vazia no horario de pico —
-// sem erro visivel, porque "0 itens" e' um estado valido. Aqui, config quebrada
-// e' RECUSADA e a anterior continua valendo; o dono le' o motivo no chat e
-// conserta com a loja funcionando.
+// The failure mode this avoids is concrete: the owner edits the config at 9pm,
+// misses a comma, runs !shopreload, and the shop sits empty through peak hours —
+// with no visible error, because "0 items" is a valid state. Here a broken
+// config is REFUSED and the previous one stays live; the owner reads the reason
+// in chat and fixes it with the shop still running.
 //
-// POR QUE O JSON E' LIDO PELO SQLITE
-// -----------------------------------
-// O mesmo motivo do Permission: o json1 do SQLite ja' esta no processo, e
-// escrever um parser de JSON a mao para ler arquivo que o dono edita a mao e'
-// codigo novo no caminho mais exposto do plugin. json_valid() antes de tudo:
-// extrair de JSON quebrado devolve NULL em silencio, e configuracao vazia com
-// cara de configuracao lida e' pior que erro.
+// WHY THE JSON IS PARSED BY SQLITE
+// ---------------------------------
+// Same reason as Permission: SQLite's json1 is already in the process, and
+// writing a JSON parser by hand to read a file the owner edits by hand is new
+// code on the plugin's most exposed path. json_valid() before anything else:
+// extracting from broken JSON returns NULL silently, and an empty configuration
+// wearing the face of a loaded one is worse than an error.
 #pragma once
 
 #include <cstdint>
@@ -31,10 +31,10 @@ namespace Shop
 {
     struct Item
     {
-        std::string chave;        // o que o jogador digita: !comprar pedra
-        std::string nome;         // o que ele le' na lista
+        std::string chave;        // what the player types: !comprar stone
+        std::string nome;         // what they read in the list
         std::string categoria;
-        std::string permissao;    // vazio = qualquer um pode
+        std::string permissao;    // empty = anyone may buy
         int32_t     templateId = 0;
         int32_t     quantidade = 1;
         int64_t     preco = 0;
@@ -44,39 +44,39 @@ namespace Shop
     {
         ConfigBanco banco;
 
-        // pontos
+        // points
         bool     pontosLigados = true;
         int      pontosMinutos = 5;
         bool     pontosSomar   = false;
         bool     pontosAvisar  = true;
         std::map<std::string, int64_t> pontosPorGrupo;
 
-        // loja
+        // shop
         int         itensPorPagina = 12;
         bool        usarTela = true;
         std::string tituloDaTela = "Loja";
         std::string contexto = "ConanShop";
 
-        // comandos
+        // commands
         std::string cmdLoja = "!shop", cmdComprar = "!comprar", cmdPontos = "!pontos",
                     cmdAjuda = "!shopajuda", cmdRecarregar = "!shopreload",
                     cmdDar = "!shopdar";
 
-        // permissoes
+        // permissions
         std::string permAdmin = "shop.admin", permComprar;
 
-        // mensagens, por chave
+        // messages, by key
         std::map<std::string, std::string> msg;
 
-        // itens, na ordem do arquivo (a ordem da lista e' a que o dono escreveu)
+        // items, in file order (the list order is the one the owner wrote)
         std::vector<Item> itens;
 
         const Item* Achar(const std::string& chave) const;
         const std::string& Msg(const char* chave, const char* padrao) const;
     };
 
-    // Le e VALIDA. Devolve false sem tocar em `destino` se algo estiver errado —
-    // e ai `erro` traz uma frase que o dono do servidor consegue agir sobre,
-    // nao um codigo.
+    // Reads and VALIDATES. Returns false without touching `destino` if anything
+    // is wrong, and then `erro` carries a sentence the server owner can act on,
+    // not a code.
     bool LerConfig(const char* caminho, Config& destino, std::string& erro);
 }

@@ -1,32 +1,33 @@
-// Pontos — a carteira de cada jogador, e a unica coisa deste plugin que
-// PRECISA sobreviver a um desligamento.
+// Pontos (points) — each player's wallet, and the only thing in this plugin
+// that HAS to survive a shutdown.
 //
-// O QUE ESTE ARQUIVO PROTEGE
-// --------------------------
-// Ponto e' dinheiro. As duas coisas que nao podem acontecer sao:
+// WHAT THIS FILE PROTECTS
+// -----------------------
+// Points are money. The two things that must not happen are:
 //
-//   1. o jogador gastar o que nao tem (saldo negativo)
-//   2. o jogador gastar duas vezes o mesmo ponto (duas compras simultaneas
-//      lendo o mesmo saldo)
+//   1. a player spending what they don't have (negative balance)
+//   2. a player spending the same point twice (two simultaneous purchases
+//      reading the same balance)
 //
-// O ArkShop, que este plugin toma como referencia, protege as duas em C++:
+// ArkShop, which this plugin takes as its reference, guards both in C++:
 //
 //     if (points >= price && Points::SpendPoints(price, eos_id))
 //
-// e o SQL por baixo e' `UPDATE ... SET Points = Points - ? WHERE EosId = ?`.
-// A checagem esta ANTES, no processo; o UPDATE nao repete a condicao. Entre o
-// GetPoints e o UPDATE cabe outra compra do mesmo jogador — dois clientes, ou
-// um clique duplo — e as duas passam. O saldo vai a negativo e ninguem ve.
+// and the SQL underneath is `UPDATE ... SET Points = Points - ? WHERE EosId = ?`.
+// The check comes BEFORE, in the process; the UPDATE doesn't repeat the
+// condition. Another purchase by the same player fits between the GetPoints and
+// the UPDATE — two clients, or a double click — and both go through. The balance
+// goes negative and nobody sees it.
 //
-// Aqui a condicao mora DENTRO do UPDATE:
+// Here the condition lives INSIDE the UPDATE:
 //
 //     UPDATE carteira SET pontos = pontos - ?  WHERE jogador = ? AND pontos >= ?
 //
-// O banco decide, uma vez, sob a trava dele. Se a linha nao foi alterada, nao
-// havia saldo — e "nao alterou" e' resposta, nao suposicao: e' o que
-// `Mudancas()` devolve. Duas compras simultaneas: a primeira altera 1 linha, a
-// segunda altera 0 e e' recusada. Nao ha janela entre ler e gastar porque nao
-// se le' antes de gastar.
+// The database decides, once, under its own lock. If no row changed, there was
+// no balance — and "changed nothing" is an answer, not an assumption: it's what
+// `Mudancas()` returns. Two simultaneous purchases: the first changes 1 row, the
+// second changes 0 and is refused. There's no window between reading and
+// spending because nothing is read before spending.
 #pragma once
 
 #include <cstdint>
@@ -34,19 +35,19 @@
 
 namespace Shop
 {
-    // Como o plugin fala com quem chama: sem excecao atravessando a fronteira
-    // do jogo, e com o motivo separado do resultado.
+    // How this module answers its caller: no exception crossing the game's
+    // boundary, and the reason kept separate from the result.
     enum class Gasto
     {
-        Ok,             // debitado
-        SemSaldo,       // nao tinha o bastante — o UPDATE nao alterou nada
-        Erro,           // o banco falhou; NADA foi debitado
+        Ok,             // debited
+        SemSaldo,       // not enough — the UPDATE changed nothing
+        Erro,           // the database failed; NOTHING was debited
     };
 
     struct ConfigBanco
     {
         bool        mysql = false;
-        std::string caminhoLocal;      // ja' resolvido
+        std::string caminhoLocal;      // already resolved
         std::string host = "127.0.0.1";
         int         porta = 3306;
         std::string usuario, senha, banco;
@@ -54,30 +55,29 @@ namespace Shop
         int         prazoOperarMs   = 10000;
     };
 
-    // Onde este modulo escreve o que deu errado. Sem isto, uma falha de banco
-    // morre dentro do plugin e o dono do servidor ve' apenas "a loja nao
-    // responde", sem uma linha dizendo por que.
+    // Where this module writes what went wrong. Without it, a database failure
+    // dies inside the plugin and the server owner only sees "the shop isn't
+    // answering", with no line saying why.
     void DefinirLog(void (*log)(const char*));
 
-    // Abre (e cria as tabelas na primeira vez). `erro` recebe o motivo em
-    // portugues quando devolve false — o dono do servidor le' isso no log e
-    // precisa saber o que fazer, nao um codigo.
+    // Opens (and creates the tables on first run). `erro` receives the reason
+    // when this returns false: the server owner reads it in the log and needs to
+    // know what to do, not a code.
     bool Abrir(const ConfigBanco& cfg, std::string& erro);
     void Fechar();
 
-    // Saldo. -1 quando o banco nao respondeu: quem chama PRECISA distinguir
-    // "tem zero" de "nao sei", porque mostrar "voce tem 0 pontos" para quem tem
-    // 500 e' pior do que dizer que a loja esta fora do ar.
+    // Balance. -1 when the database didn't answer: the caller MUST distinguish
+    // "has zero" from "don't know", because telling someone with 500 points that
+    // they have 0 is worse than telling them the shop is down.
     int64_t Saldo(const std::string& jogador);
 
-    // Credita. Devolve false se o banco falhou (nada foi creditado).
+    // Credits. Returns false if the database failed (nothing was credited).
     bool Creditar(const std::string& jogador, int64_t quanto, const char* motivo);
 
-    // Debita SE houver saldo — a decisao e' do banco, num comando so'.
+    // Debits IF there's balance. The database decides, in a single statement.
     Gasto Debitar(const std::string& jogador, int64_t quanto, const char* motivo);
 
-    // Para o caso de a entrega falhar depois do debito. E' um credito comum;
-    // existe com nome proprio para aparecer no diario como devolucao e nao
-    // como premio.
+    // For when delivery fails after the debit. It's an ordinary credit; it has
+    // its own name so the ledger shows it as a refund rather than a reward.
     bool Devolver(const std::string& jogador, int64_t quanto, const char* motivo);
 }

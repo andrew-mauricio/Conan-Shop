@@ -1,4 +1,4 @@
-// Comandos — implementacao. O porque esta no Comandos.h.
+// Comandos (commands) — implementation. The reasoning is in Comandos.h.
 #include "Comandos.h"
 #include "Pontos.h"
 #include "Config.h"
@@ -16,8 +16,8 @@
 namespace Shop
 {
 // Vem do ConanShop.cpp: a tabela da API e a configuracao viva. Declarados aqui
-// em vez de passados por parametro porque este modulo e' chamado pelo
-// agendador, que nao carrega contexto.
+// rather than passed as parameters, because this module is called by the
+// scheduler, which carries no context.
 extern const ConanApiTabela* ApiDaLoja();
 extern const Config&         ConfigDaLoja();
 extern bool                  RecarregarConfig(std::string& erro, size_t& quantos);
@@ -27,20 +27,20 @@ namespace
 {
     std::string g_fila, g_respostas;
 
-    // ── O QUE FICOU PARA CONFIRMAR NA PROXIMA PASSADA ───────────────────────
+    // ── WHAT'S LEFT TO CONFIRM ON THE NEXT PASS ─────────────────────────────
     //
-    // A escrita do Permission e' ASSINCRONA: `conceder` poe a tarefa na fila da
-    // thread escritora dele e devolve 1 se conseguiu ENFILEIRAR. A validacao do
-    // grupo acontece depois, la' dentro.
+    // Permission's writes are ASYNCHRONOUS: `conceder` puts the task on its
+    // writer thread's queue and returns 1 if it managed to ENQUEUE it. The
+    // group's validation happens later, in there.
     //
-    // A primeira versao tratou esse 1 como sucesso e respondeu
-    // "ok grupo A-4QR7CRS0F -> naoexiste" para um grupo que NAO EXISTE. O
-    // Permission fez tudo certo (recusou e logou "conceder ignorado: grupo
-    // 'naoexiste' nao existe") — foi a MINHA resposta que mentiu.
+    // The first version treated that 1 as success and answered
+    // "ok grupo A-4QR7CRS0F -> naoexiste" for a group that DOESN'T EXIST.
+    // Permission did everything right (it refused and logged "conceder
+    // ignorado: grupo 'naoexiste' nao existe"). It was MY answer that lied.
     //
-    // Agora o resultado e' PERGUNTADO depois, com `no_grupo`, na passada
-    // seguinte da fila (3 s). Quem le' SHOP-RESPOSTAS ve' primeiro
-    // "enfileirado" e, um instante depois, "CONFIRMADO" ou "NAO ENTROU".
+    // The result is now ASKED FOR afterwards, with `no_grupo`, on the queue's
+    // next pass (3 s). Whoever reads SHOP-RESPOSTAS sees "enqueued" first and,
+    // a moment later, "CONFIRMED" or "DIDN'T GO IN".
     struct Pendente
     {
         int         linha;
@@ -75,14 +75,14 @@ namespace
         return p;
     }
 
-    // Aceita id de conta OU nome de quem esta online. O id e' o caminho certo
-    // (nao muda); o nome existe porque e' o que o dono tem na mao quando olha o
-    // `listplayers` do RCON.
+    // Accepts an account id OR the name of someone online. The id is the right
+    // path (it doesn't change); the name exists because it's what the owner has
+    // in hand when looking at RCON's `listplayers`.
     bool Resolver(const std::string& quem, std::string& id, std::string& porque)
     {
-        // Um id de conta do Conan comeca com "A-" e nao tem "#". O nome de
-        // exibicao tem "#" (Indio#76973). Tentar o id primeiro evita ir ao
-        // mundo a toa.
+        // A Conan account id starts with "A-" and has no "#". A display name
+        // has one (Indio#76973). Trying the id first avoids walking the world
+        // for nothing.
         if (quem.find('#') == std::string::npos)
         {
             id = quem;
@@ -161,8 +161,8 @@ void AtenderFila()
     if (!f)
     {
         if (confirmacoes.empty()) return;   // o caso comum: nada a fazer
-        // So' confirmacoes: ACRESCENTA ao arquivo de respostas, para nao apagar
-        // o "enfileirado" que o dono acabou de ler.
+        // Confirmations only: APPENDS to the replies file, so the "enqueued"
+        // line the owner just read isn't wiped.
         FILE* r = std::fopen(g_respostas.c_str(), "ab");
         if (r)
         {
@@ -182,9 +182,10 @@ void AtenderFila()
 
     // ── APAGAR ANTES DE EXECUTAR ────────────────────────────────────────────
     //
-    // Se o servidor cair no meio de um "dar 500 pontos", a fila nao pode estar
-    // la' na volta para dar de novo. Perder um comando e' recuperavel (o dono
-    // repete); dar pontos duas vezes nao aparece para ninguem.
+    // If the server dies midway through a "give 500 points", the queue must not
+    // still be there on the way back to do it again. Losing a command is
+    // recoverable (the owner repeats it); giving points twice shows up to
+    // nobody.
     std::remove(g_fila.c_str());
 
     const ConanApiTabela* api = ApiDaLoja();
@@ -244,23 +245,23 @@ void AtenderFila()
             continue;
         }
 
-        // ── grupo/tirargrupo: administrar VIP de fora do jogo ───────────────
+        // ── grupo/tirargrupo: administering VIP from outside the game ───────
         //
-        // POR QUE ISTO MORA AQUI, E NAO NO Permission
+        // WHY THIS LIVES HERE AND NOT IN Permission
         //
-        // O Permission expoe `conceder`/`revogar` na ABI dele, mas nao tem
-        // porta de fora: quem quisesse dar VIP precisava de um plugin so' para
-        // chamar a funcao, ou de reiniciar o servidor depois de mexer no banco
-        // a mao — e mexer no banco de outro plugin, com WAL e cache em memoria,
-        // e' pedir para corromper.
+        // Permission exposes `conceder`/`revogar` in its ABI, but it has no
+        // outside door: anyone wanting to grant VIP needed a plugin just to call
+        // the function, or had to restart the server after editing the database
+        // by hand — and editing another plugin's database, with WAL and an
+        // in-memory cache, is asking for corruption.
         //
-        // O ConanShop ja' linka o Permission (precisa dele para VIP e para a
-        // identidade) e ja' tem uma fila que painel web, script e SSH sabem
-        // escrever. Acrescentar dois verbos aqui custa 30 linhas e resolve.
+        // ConanShop already links Permission (it needs it for VIP and for
+        // identity) and already has a queue that web panels, scripts and SSH
+        // know how to write. Adding two verbs here costs 30 lines and solves it.
         //
-        // Vale para QUALQUER grupo do permission.json, nao so' os que dao
-        // pontos: quem criar um grupo "patrono" ou "construtor" administra por
-        // aqui do mesmo jeito.
+        // It works for ANY group in permission.json, not only the ones that
+        // grant points: whoever creates a "patron" or "builder" group
+        // administers it the same way.
         if (verbo == "grupo" || verbo == "tirargrupo")
         {
             if (p.size() < 3)
@@ -298,7 +299,8 @@ void AtenderFila()
                 : (perm->revogar  ? perm->revogar (id.c_str(), p[2].c_str(),
                                                    "fila do ConanShop") : -1);
 
-            // 1 e' "ACEITO PARA GRAVAR", nao "gravado" — ver ConfirmarPendentes.
+            // 1 means "ACCEPTED FOR WRITING", not "written" — see
+            // ConfirmarPendentes.
             if (r == 1)
             {
                 g_pendentes.push_back({ linhaN, id, p[2], verbo == "grupo" });
@@ -312,11 +314,11 @@ void AtenderFila()
                         linhaN, verbo.c_str(), id.c_str(), p[2].c_str());
             }
             else if (r == 0)
-                // A dica das MAIUSCULAS nao e' enfeite: as chaves de grupo sao
-                // comparadas exatamente como estao no permission.json, entao
-                // "VIP" e' recusado onde "vip" passa. Sem esta linha, quem
-                // digita o nome certo com a caixa errada le' "nao existe" e vai
-                // procurar o grupo que esta' bem ali.
+                // The hint about CAPITALS isn't decoration: group keys are
+                // compared exactly as they appear in permission.json, so "VIP"
+                // is refused where "vip" passes. Without this line, someone who
+                // types the right name in the wrong case reads "doesn't exist"
+                // and goes looking for a group that's sitting right there.
                 std::snprintf(resp, sizeof(resp),
                     "linha %d: RECUSADO %s — nao existe grupo \"%s\" no permission.json. "
                     "Confira a caixa: as chaves diferenciam maiusculas (\"vip\" nao e' \"VIP\").",
@@ -360,8 +362,8 @@ void AtenderFila()
             continue;
         }
 
-        // O motivo vai para o diario. Sem ele, uma auditoria de "de onde vieram
-        // estes 5.000 pontos" nao tem resposta.
+        // The reason goes into the ledger. Without it, an audit asking "where
+        // did these 5,000 points come from" has no answer.
         std::string motivo = "admin";
         for (size_t i = 3; i < p.size(); ++i) { motivo += ' '; motivo += p[i]; }
 
@@ -432,9 +434,9 @@ void AtenderFila()
 
     // ── as respostas ────────────────────────────────────────────────────────
     //
-    // Sobrescreve, nao acumula: o arquivo responde ao ULTIMO lote, e quem
-    // automatiza le' e sabe que aquilo e' a resposta do que acabou de mandar.
-    // O historico permanente e' o diario, no banco.
+    // Overwrites rather than accumulating: the file answers the LAST batch, and
+    // whoever automates it reads that and knows it's the answer to what they
+    // just sent. The permanent history is the ledger, in the database.
     FILE* r = std::fopen(g_respostas.c_str(), "wb");
     if (r)
     {

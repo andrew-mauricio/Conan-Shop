@@ -1,18 +1,19 @@
-// Pontos — implementacao. O porque das decisoes esta no Pontos.h.
+// Pontos (points) — implementation. The reasoning behind the decisions is in
+// Pontos.h.
 //
-// DOIS BANCOS, UM COMPORTAMENTO
-// -----------------------------
-// SQLite e MySQL entram pelas mesmas quatro funcoes, e o codigo da loja nao
-// sabe qual esta ligado. O que NAO e' negociavel entre os dois:
+// TWO BACKENDS, ONE BEHAVIOUR
+// ---------------------------
+// SQLite and MySQL come in through the same four functions, and the shop's code
+// doesn't know which one is live. What is NOT negotiable between them:
 //
-//   · o debito e' um UPDATE unico com a condicao de saldo dentro;
-//   · "quantas linhas mudaram" e' lido do banco, nunca inferido;
-//   · toda operacao que falha devolve falha — nenhuma devolve "deu certo"
-//     quando o banco nao respondeu.
+//   · the debit is a single UPDATE with the balance condition inside it;
+//   · "how many rows changed" is read from the database, never inferred;
+//   · every operation that fails returns failure. None returns "it worked" when
+//     the database didn't answer.
 //
-// O terceiro item parece obvio e e' onde plugins de loja costumam vazar: um
-// `Executar()` que devolve void, ou um erro engolido, viram pontos que somem
-// ou dobram sem deixar rastro.
+// That third item looks obvious and is where shop plugins usually leak: an
+// `Executar()` that returns void, or a swallowed error, becomes points that
+// vanish or double with no trace left behind.
 #include "Pontos.h"
 
 #include "terceiros/sqlite3/sqlite3.h"
@@ -27,13 +28,14 @@ namespace Shop
 {
 namespace
 {
-    // ── a trava ─────────────────────────────────────────────────────────────
+    // ── the lock ────────────────────────────────────────────────────────────
     //
-    // O credito por tempo roda na thread do jogo; a compra tambem. Hoje sao a
-    // mesma thread, e por isso esta trava quase nunca disputa. Ela existe
-    // porque "hoje sao a mesma" e' uma propriedade do agendador da API, nao
-    // uma garantia desta classe — e o dia em que deixar de ser, o sintoma seria
-    // saldo errado sob carga, que e' o defeito mais caro de diagnosticar.
+    // Timed credits run on the game thread; so do purchases. Today they're the
+    // same thread, which is why this lock almost never contends. It exists
+    // because "today they're the same" is a property of the API's scheduler, not
+    // a guarantee of this class — and the day that stops being true, the symptom
+    // would be a wrong balance under load, which is the most expensive kind of
+    // defect to diagnose.
     std::mutex          g_trava;
 
     bool                g_mysql = false;
@@ -41,8 +43,8 @@ namespace
     Perm::MySqlCliente* g_my    = nullptr;
     std::string         g_erroUltimo;
 
-    // Log opcional — quem chama instala. Sem isto, uma falha de banco morre em
-    // silencio dentro do plugin.
+    // Optional log; the caller installs it. Without this, a database failure
+    // dies silently inside the plugin.
     void (*g_log)(const char*) = nullptr;
     void Registrar(const char* fmt, ...)
     {
@@ -54,15 +56,15 @@ namespace
         g_log(linha);
     }
 
-    // ── o esquema ───────────────────────────────────────────────────────────
+    // ── the schema ──────────────────────────────────────────────────────────
     //
-    // `pontos` com CHECK >= 0 no SQLite: se algum caminho futuro tentar deixar
-    // o saldo negativo, o banco RECUSA em vez de gravar. E' a rede sob a rede —
-    // a condicao no UPDATE ja' impede, e esta linha e' o que sobra se alguem
-    // acrescentar um caminho novo e esquecer da condicao.
+    // `pontos` with CHECK >= 0 on SQLite: if some future path tries to leave the
+    // balance negative, the database REFUSES instead of writing. It's the net
+    // under the net — the condition in the UPDATE already prevents it, and this
+    // line is what's left if someone adds a new path and forgets the condition.
     //
-    // O diario nao e' enfeite: quando um jogador disser "comprei e nao recebi",
-    // ele e' a unica forma de saber o que aconteceu.
+    // The ledger isn't decoration: when a player says "I bought it and never got
+    // it", it's the only way to know what happened.
     const char* const ESQUEMA_SQLITE[] = {
         "CREATE TABLE IF NOT EXISTS carteira ("
         "  jogador TEXT PRIMARY KEY,"
@@ -99,33 +101,36 @@ namespace
 
     int64_t Agora()
     {
-        // time() basta: o diario e' para leitura humana, nao para ordenacao
-        // com precisao de milissegundo.
+        // time() is enough: the ledger is for humans to read, not for
+        // millisecond-precision ordering.
         return int64_t(std::time(nullptr));
     }
 
-    // ── montar SQL sem truncar em silencio ──────────────────────────────────
+    // ── building SQL without truncating silently ────────────────────────────
     //
-    // POR QUE ISTO E' UMA FUNCAO, E NAO UM snprintf SOLTO EM CADA LUGAR
+    // WHY THIS IS A FUNCTION, AND NOT A LOOSE snprintf IN EACH PLACE
     //
-    // snprintf trunca calado e devolve o tamanho que PRECISARIA. Num comando de
-    // dinheiro, o corte mais caro possivel cai entre a tabela e a condicao:
+    // snprintf truncates quietly and returns the size it WOULD have needed. In a
+    // statement about money, the most expensive possible cut falls between the
+    // table and the condition:
     //
     //     UPDATE carteira SET pontos = pontos - 10 WHERE jogador='xxx
-    //                                              ^ cortado aqui
+    //                                              ^ cut here
     //
-    // Se o corte deixar aspas abertas, o MySQL recusa — sorte. Se cair logo
-    // DEPOIS do fecha-aspas e antes do `AND pontos >= N`, sai um UPDATE valido
-    // SEM a condicao de saldo, e o banco executa com prazer. Pior ainda no
-    // credito: um corte antes do WHERE credita a TABELA INTEIRA.
+    // If the cut leaves a quote open, MySQL refuses, and that's luck. If it
+    // lands just AFTER the closing quote and before the `AND pontos >= N`, out
+    // comes a valid UPDATE WITHOUT the balance condition, and the database
+    // executes it happily. Worse still on a credit: a cut before the WHERE
+    // credits the ENTIRE TABLE.
     //
-    // Com o id da conta limitado a 64 caracteres isso nao acontece hoje — o
-    // pior caso fica perto de 230 bytes num buffer de 512. Mas "hoje nao
-    // acontece" nunca foi garantia: basta o id crescer ou alguem trocar a chave
-    // da carteira, e o defeito volta sem uma linha de aviso.
+    // With the account id capped at 64 characters this doesn't happen today; the
+    // worst case sits near 230 bytes in a 512-byte buffer. But "doesn't happen
+    // today" was never a guarantee: the id only has to grow, or someone has to
+    // change the wallet's key, and the defect comes back without a line of
+    // warning.
     //
-    // Devolve false quando nao coube. Quem chama TEM de tratar como falha e nao
-    // executar nada.
+    // Returns false when it didn't fit. The caller MUST treat that as failure
+    // and execute nothing.
     bool MontarSql(char* destino, size_t tam, const char* fmt, ...)
     {
         va_list a;
@@ -133,8 +138,8 @@ namespace
         const int n = std::vsnprintf(destino, tam, fmt, a);
         va_end(a);
         if (n >= 0 && size_t(n) < tam) return true;
-        Registrar("[shop] comando SQL NAO coube (%d bytes, cabem %d). "
-                  "Operacao recusada — nada foi alterado.", n, int(tam) - 1);
+        Registrar("[shop] SQL statement did NOT fit (%d bytes, %d available). "
+                  "Operation refused; nothing was changed.", n, int(tam) - 1);
         if (tam) destino[0] = 0;
         return false;
     }
@@ -168,13 +173,14 @@ namespace
             return false;
         }
 
-        // busy_timeout: o Conan grava o mundo em SQLite tambem, e um disco
-        // ocupado nao pode virar compra recusada. 5 s de espera antes de
-        // desistir.
+        // busy_timeout: Conan writes the world to SQLite as well, and a busy
+        // disk must not turn into a refused purchase. Five seconds of waiting
+        // before giving up.
         sqlite3_busy_timeout(g_db, 5000);
 
-        // WAL para o leitor nao bloquear o escritor. Quem apagar o .db precisa
-        // apagar -wal e -shm junto, e isso esta dito no config.json.
+        // WAL so a reader doesn't block the writer. Anyone deleting the .db
+        // has to delete -wal and -shm along with it, and that's stated in
+        // config.json.
         if (!SqliteExecutar("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;"))
         { erro = g_erroUltimo; return false; }
 
@@ -188,16 +194,16 @@ namespace
 
     bool AbrirMysql(const ConfigBanco& cfg, std::string& erro)
     {
-        // Estas recusas sao deliberadas. Cair num padrao aqui — 'root', ou um
-        // nome de banco inventado — grava os pontos dos jogadores num lugar que
-        // o dono nao escolheu e nao vai procurar.
+        // These refusals are deliberate. Falling back to a default here —
+        // 'root', or an invented database name — writes the players' points
+        // somewhere the owner didn't choose and won't go looking.
         if (cfg.usuario.empty())
         { erro = "com banco mysql, mysql_usuario nao pode ficar vazio"; return false; }
         if (cfg.banco.empty())
         { erro = "com banco mysql, mysql_banco nao pode ficar vazio"; return false; }
 
-        // Espaco na ponta nao aparece na tela e faz o valor parecer certo. Os
-        // colchetes na mensagem sao o que torna o espaco visivel.
+        // Whitespace at either end doesn't show on screen and makes the value
+        // look correct. The brackets in the message are what make it visible.
         auto temEspacoNaPonta = [](const std::string& s)
         { return !s.empty() && (std::isspace((unsigned char)s.front()) ||
                                 std::isspace((unsigned char)s.back())); };
@@ -235,8 +241,8 @@ namespace
         return true;
     }
 
-    // Garante a linha do jogador. Sem isso, o UPDATE do debito nao encontra
-    // nada e "sem saldo" e "jogador novo" ficariam indistinguiveis.
+    // Ensures the player's row exists. Without it the debit's UPDATE finds
+    // nothing, and "no balance" and "new player" would be indistinguishable.
     bool GarantirJogador(const std::string& jogador)
     {
         if (g_mysql)
@@ -262,7 +268,7 @@ namespace
     void Anotar(const std::string& jogador, int64_t delta, const char* motivo)
     {
         // O diario nunca derruba a operacao: perder uma linha de historico e'
-        // ruim, recusar um credito porque o historico falhou seria pior.
+        // bad, refusing a credit because the history failed would be worse.
         if (g_mysql)
         {
             char sql[768], err[512];
@@ -375,7 +381,7 @@ bool Creditar(const std::string& jogador, int64_t quanto, const char* motivo)
     return true;
 }
 
-// ── o debito: a operacao que este arquivo existe para acertar ───────────────
+// ── the debit: the operation this file exists to get right ──────────────────
 Gasto Debitar(const std::string& jogador, int64_t quanto, const char* motivo)
 {
     if (jogador.empty() || quanto <= 0) return Gasto::Erro;
@@ -394,13 +400,14 @@ Gasto Debitar(const std::string& jogador, int64_t quanto, const char* motivo)
             return Gasto::Erro;
 
         // O truncamento e' recusado dentro do MontarSql, acima — e ele diz no
-        // log qual comando nao coube. O porque de isso ser fatal aqui esta na
-        // definicao dele.
+        // log which statement didn't fit. Why that's fatal here is explained at
+        // its definition.
         if (!g_my->Executar(sql, err, sizeof(err)))
         { Registrar("[shop] debitar: %s", err); return Gasto::Erro; }
 
         // "Quantas linhas mudaram" vem do BANCO. Zero significa que a condicao
-        // de saldo nao passou — e nao ha nada a desfazer, porque nada mudou.
+        // balance condition didn't pass, and there's nothing to undo, because
+        // nothing changed.
         if (g_my->LinhasAfetadas() == 0) return Gasto::SemSaldo;
     }
     else
@@ -425,7 +432,7 @@ Gasto Debitar(const std::string& jogador, int64_t quanto, const char* motivo)
 bool Devolver(const std::string& jogador, int64_t quanto, const char* motivo)
 {
     // Devolucao tambem abate o `gasto`, senao a estatistica de quanto o jogador
-    // gastou passa a contar compras que nao aconteceram.
+    // spent would start counting purchases that never happened.
     if (jogador.empty() || quanto <= 0) return false;
     {
         std::lock_guard<std::mutex> t(g_trava);

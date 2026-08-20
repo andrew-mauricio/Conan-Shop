@@ -1,4 +1,4 @@
-// Config — implementacao. O porque das decisoes esta no Config.h.
+// Config — implementation. The reasoning behind the decisions is in Config.h.
 #include "Config.h"
 
 #include "terceiros/sqlite3/sqlite3.h"
@@ -87,8 +87,8 @@ namespace
             return padrao;
         }
 
-        // Percorre um objeto: chama `fn` por chave. E' json_each, que so' existe
-        // no SQLite — outro motivo para o JSON ser lido por ele.
+        // Walks an object, calling `fn` per key. That's json_each, which only
+        // exists in SQLite: another reason the JSON is parsed by it.
         bool CadaChave(const std::string& t, const char* caminho,
                        void (*fn)(const char* chave, const char* valor, void* ctx),
                        void* ctx, std::string& erro)
@@ -176,8 +176,8 @@ const std::string& Config::Msg(const char* chave, const char* padrao) const
 {
     auto it = msg.find(chave);
     if (it != msg.end() && !it->second.empty()) return it->second;
-    // O padrao vive aqui, num static por chave: uma mensagem faltando no
-    // arquivo nao pode virar linha vazia no chat do jogador.
+    // The default lives here, in a static per key: a message missing from the
+    // file must not turn into an empty line in the player's chat.
     static std::map<std::string, std::string> padroes;
     auto p = padroes.emplace(chave, padrao);
     return p.first->second;
@@ -278,8 +278,9 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
     c.cmdRecarregar = cmd("$.comandos.recarregar", "!shopreload");
     c.cmdDar        = cmd("$.comandos.dar",        "!shopdar");
 
-    // Dois comandos iguais: o primeiro atende sempre e o segundo nunca roda —
-    // e o dono passaria a noite procurando por que "!pontos nao funciona".
+    // Two identical commands: the first always answers and the second never
+    // runs, and the owner would spend the night wondering why "!pontos doesn't
+    // work".
     {
         const std::string* todos[] = { &c.cmdLoja, &c.cmdComprar, &c.cmdPontos,
                                        &c.cmdAjuda, &c.cmdRecarregar, &c.cmdDar };
@@ -310,12 +311,12 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
             }, &ctx, e);
     }
 
-    // ── itens ───────────────────────────────────────────────────────────────
+    // ── items ───────────────────────────────────────────────────────────────
     //
-    // Cada item e' validado. Um item ruim NAO invalida o arquivo inteiro — ele
-    // fica de fora e e' contado, porque um id errado no item 40 nao deve tirar
-    // a loja do ar. Mas se NENHUM item passar, ai sim e' recusa: loja sem item
-    // e' loja que cobra e nao entrega.
+    // Every item is validated. A bad item does NOT invalidate the whole file: it
+    // is left out and counted, because a wrong id on item 40 shouldn't take the
+    // shop down. But if NO item passes, then it is a refusal: a shop with no
+    // items is a shop that charges and delivers nothing.
     {
         CtxItens ctx{ &j, &c, &erro, 0 };
         std::string e;
@@ -343,9 +344,9 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
                 it.quantidade = int32_t(x->j->Inteiro(v, "$.quantidade", 1));
                 it.preco      = x->j->Inteiro(v, "$.preco", -1);
 
-                // template_id 0 e' o valor que um campo ausente produz, e
-                // entregar o item 0 nao entrega nada: o jogador paga e nao
-                // recebe. Recusar e' a unica resposta honesta.
+                // template_id 0 is what a missing field produces, and
+                // delivering item 0 delivers nothing: the player pays and
+                // receives nothing. Refusing is the only honest answer.
                 if (it.templateId <= 0)   { ++x->recusados; return; }
                 if (it.quantidade <= 0)   { ++x->recusados; return; }
                 if (it.preco < 0)         { ++x->recusados; return; }
@@ -369,8 +370,8 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
         }
         if (ctx.recusados > 0)
         {
-            // Nao e' erro, mas nao pode passar calado: o dono precisa saber que
-            // o que ele escreveu nao entrou inteiro.
+            // Not an error, but it can't pass silently: the owner needs to know
+            // that what they wrote didn't go in whole.
             c.msg["_aviso_itens_recusados"] = std::to_string(ctx.recusados);
         }
     }

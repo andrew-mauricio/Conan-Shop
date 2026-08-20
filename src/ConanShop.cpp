@@ -1,35 +1,40 @@
-// ConanShop — loja por pontos para Conan Exiles, no espirito do ArkShop.
+// ConanShop — a points shop for Conan Exiles, in the spirit of ArkShop.
 //
-// O QUE ELE FAZ
-// -------------
-//   · credita pontos a quem esta online, por tempo, com valor por grupo (VIP)
-//   · !shop        mostra a lista, paginada, na tela do jogo
-//   · !comprar id  debita e entrega o item no inventario
-//   · !pontos      mostra o saldo
-//   · !shopreload  rele o config.json (so' para quem tem shop.admin)
+// WHAT IT DOES
+// ------------
+//   · credits points to whoever is online, over time, with a per-group (VIP) rate
+//   · !shop        shows the catalogue, paginated, on the game's screen
+//   · !comprar id  debits and delivers the item into the inventory
+//   · !pontos      shows the balance
+//   · !shopreload  re-reads config.json (only for holders of shop.admin)
 //
-// O QUE FOI FEITO DIFERENTE DO ArkShop, E POR QUE
+// WHAT WAS DONE DIFFERENTLY FROM ArkShop, AND WHY
 // ------------------------------------------------
-// 1. O DEBITO E' ATOMICO. O ArkShop faz `if (pontos >= preco && Gastar(preco))`
-//    e o SQL por baixo e' `UPDATE ... SET Points = Points - ?` sem condicao.
-//    Entre ler e gastar cabe outra compra do mesmo jogador. Aqui a condicao vai
-//    dentro do UPDATE e quem decide e' o banco (ver Pontos.h).
+// 1. THE DEBIT IS ATOMIC. ArkShop does `if (points >= price && Spend(price))`
+//    and the SQL underneath is `UPDATE ... SET Points = Points - ?` with no
+//    condition. Another purchase by the same player fits between the read and
+//    the spend. Here the condition goes inside the UPDATE and the database
+//    decides (see Pontos.h).
 //
-// 2. A CHAVE DE VENDA E' O TemplateId, NAO A BLUEPRINT. No ARK vale "uma
-//    blueprint = um item". No Conan nao: Stone (10001) e centenas de outros
-//    itens simples compartilham a classe nativa /Script/ConanSandbox.GameItem.
-//    Uma loja modelada como a do ARK entregaria o item errado — e funcionando,
-//    sem erro nenhum no log.
+// 2. THE SALE KEY IS THE TemplateId, NOT THE BLUEPRINT. In ARK, "one blueprint
+//    = one item" holds. In Conan it doesn't: Stone (10001) and hundreds of other
+//    simple items share the native class /Script/ConanSandbox.GameItem. A shop
+//    modelled the ARK way would deliver the wrong item — and do it successfully,
+//    with no error in the log.
 //
-// 3. CONFIG QUEBRADA NAO SUBSTITUI A BOA. Ver Config.h.
+// 3. A BROKEN CONFIG DOESN'T REPLACE A WORKING ONE. See Config.h.
 //
-// O QUE AINDA NAO ESTA PROVADO COM JOGADOR REAL
-// ----------------------------------------------
-// A entrega (SpawnTemplateItem) e a tela (ClientShowMessageBox) foram escritas
-// contra a assinatura que a reflexao desta build declara, e o caminho
-// chat->jogador ja' esta provado no ar pelo ExemploJogador. Mas nenhuma das
-// duas foi vista funcionando com um jogador de verdade dentro do jogo — e
-// neste projeto isso nao conta como pronto. Ver o README.
+// PROVEN WITH A REAL PLAYER — 2026-08-20
+// ---------------------------------------
+// Delivery (SpawnTemplateItem) and the on-screen list (ClientShowMessageBox)
+// were verified in game, not just against the signatures reflection declares:
+// !pontos answered, !shop drew the message box, and !comprar stone delivered
+// 100 stone into the player's inventory while debiting 10 points.
+//
+// What that same session caught, and no automated test would have: the first
+// version answered NOTHING. The chat hook fired, read the command and cancelled
+// the message correctly, and the reply died on the way back without a single
+// line in the log. See Falar() below for the cause and the fix.
 #include "Conan/ConanPluginApi.h"
 #include "Conan/ConanBase.h"
 #include "Conan/ConanPermission.h"
@@ -49,11 +54,11 @@ static const ConanApiTabela* g_api = nullptr;
 static Shop::Config          g_cfg;
 static std::string           g_caminhoConfig;
 
-// ── ler um ponteiro de membro, pelo NOME ────────────────────────────────────
+// ── read a member pointer, BY NAME ──────────────────────────────────────────
 //
-// O mesmo padrao do ExemploJogador, e pelo mesmo motivo: gravar 0x308 funciona
-// hoje e le' o campo vizinho depois do proximo patch da Funcom, sem erro e sem
-// log — so' com dado errado.
+// The same pattern as ExemploJogador, for the same reason: hardcoding 0x308
+// works today and reads the neighbouring field after Funcom's next patch, with
+// no error and no log entry, just wrong data.
 static void* MembroPonteiro(void* obj, const char* nome)
 {
     if (!obj) return nullptr;
@@ -65,16 +70,16 @@ static void* MembroPonteiro(void* obj, const char* nome)
     return p;
 }
 
-// ── quem e' este jogador ────────────────────────────────────────────────────
+// ── who is this player ──────────────────────────────────────────────────────
 //
-// A identidade vem do Permission, que ja' resolveu essa pergunta e a provou com
-// jogador real (MasterAccountId). Resolver de novo aqui seria uma segunda
-// verdade sobre a mesma coisa — e as duas divergiriam no dia em que a chave
-// mudasse.
+// Identity comes from Permission, which already answered that question and
+// proved it with a real player (MasterAccountId). Resolving it again here would
+// be a second truth about the same thing, and the two would diverge the day the
+// key changed.
 struct Jogador
 {
-    std::string id;       // a chave da carteira
-    std::string nome;     // para falar com ele no chat
+    std::string id;       // the wallet's key
+    std::string nome;     // for talking to them in chat
     void*       controller = nullptr;
 };
 
@@ -100,12 +105,12 @@ static bool Identificar(void* controller, Jogador& j)
         if (perm->id_do_controller(controller, id, sizeof(id)) > 0 && id[0])
         {
             j.id = id;
-            // Identidade PARCIAL: o id resolveu e o nome nao. Isto era o
-            // suficiente para a loja funcionar por dentro e nao responder nada
-            // ao jogador, porque o caminho antigo de mensagem procurava a
-            // pessoa PELO NOME. Hoje a resposta vai pelo controller e nao
-            // depende disto — mas continua valendo dizer, uma vez, porque nome
-            // vazio tambem estraga a lista de online e as mensagens de admin.
+            // PARTIAL identity: the id resolved and the name didn't. That was
+            // enough for the shop to work internally and answer the player
+            // nothing, because the old message path looked the person up BY
+            // NAME. Today the reply goes through the controller and doesn't
+            // depend on this, but it's still worth saying once, because an
+            // empty name also spoils the online list and admin messages.
             if (j.nome.empty())
             {
                 static bool avisou = false;
@@ -121,37 +126,39 @@ static bool Identificar(void* controller, Jogador& j)
         }
     }
 
-    // Sem Permission nao ha' identidade estavel, e uma carteira presa ao NOME
-    // do jogador seria pior que nenhuma: o jogador troca o nome de exibicao e
-    // os pontos dele somem, sem erro e sem volta. Melhor recusar e dizer.
+    // Without Permission there's no stable identity, and a wallet keyed on the
+    // player's NAME would be worse than none: the player changes their display
+    // name and their points vanish, with no error and no way back. Better to
+    // refuse and say so.
     return false;
 }
 
-// ── responder ao jogador ────────────────────────────────────────────────────
+// ── answering the player ────────────────────────────────────────────────────
 //
-// A PRIMEIRA VERSAO DESTA FUNCAO ERA UMA LINHA, E FALHAVA EM SILENCIO:
+// THE FIRST VERSION OF THIS FUNCTION WAS ONE LINE, AND FAILED SILENTLY:
 //
 //     if (j.nome.empty() || texto.empty()) return;
 //     g_api->MensagemParaJogador(j.nome.c_str(), texto.c_str());
 //
-// Duas coisas erradas, as duas invisiveis. Primeira: se o nome nao tivesse sido
-// lido, ela desistia sem dizer nada — e `Identificar` devolve true com o nome
-// VAZIO, desde que o Permission tenha resolvido o id. Segunda: o retorno de
-// `MensagemParaJogador` era ignorado, entao uma falha dele tambem sumia.
+// Two things wrong, both invisible. First: if the name hadn't been read, it gave
+// up without saying anything — and `Identificar` returns true with an EMPTY
+// name, as long as Permission resolved the id. Second: the return value of
+// `MensagemParaJogador` was ignored, so a failure there vanished too.
 //
-// Medido com jogador real em 20/08/2026: o Andrew digitou `!pontos` tres vezes,
-// o hook DISPAROU e CANCELOU a mensagem as tres — e nada apareceu na tela dele.
-// O log nao tinha uma linha sobre isso, porque nao havia nenhuma para ter.
+// Measured with a real player on 2026-08-20: Andrew typed `!pontos` three times,
+// the hook FIRED and CANCELLED the message all three times, and nothing appeared
+// on his screen. The log had no line about it, because there was none to have.
 //
-// E ha um erro de desenho por tras dos dois: procurar o jogador PELO NOME
-// quando o controller dele esta na mao. `MensagemParaJogador` percorre o mundo
-// atras de um CheatManager e chama `PlayerMessage(nome, texto)` — um caminho
-// longo, que depende de um objeto que pode nem existir, para entregar algo a
-// quem ja' esta identificado.
+// And there's a design error behind both: looking the player up BY NAME when
+// their controller is already in hand. `MensagemParaJogador` walks the world
+// hunting for a CheatManager and calls `PlayerMessage(name, text)` — a long path
+// that depends on an object which may not even exist, to deliver something to
+// someone already identified.
 //
-// Agora vai direto ao controller, e tenta os caminhos em ordem de preferencia.
-// O primeiro que a build tiver, ganha; e o log diz QUAL pegou, uma vez — assim
-// a proxima build que mexer nisso aparece no log em vez de emudecer a loja.
+// It now goes straight to the controller, trying the routes in order of
+// preference. The first one this build has, wins; and the log says WHICH one
+// took it, once — so the next build that changes this shows up in the log
+// instead of silencing the shop.
 static void Falar(const Jogador& j, const std::string& texto)
 {
     if (texto.empty()) return;
@@ -162,7 +169,7 @@ static void Falar(const Jogador& j, const std::string& texto)
         return;
     }
 
-    // 0 = ainda nao sei · 1..3 = o caminho que funcionou · -1 = nenhum
+    // 0 = don't know yet · 1..3 = the route that worked · -1 = none did
     static int caminho = 0;
 
     auto tentar = [&](int qual) -> bool
@@ -170,8 +177,8 @@ static void Falar(const Jogador& j, const std::string& texto)
         switch (qual)
         {
         case 1:
-            // A notificacao padrao do HUD: e' o que o proprio jogo usa para
-            // avisar o jogador, entao aparece onde ele ja' olha.
+            // The HUD's standard notification: it's what the game itself uses
+            // to tell the player things, so it appears where they already look.
             ConanApi::Call<void>(j.controller, "ClientHUDShowNotification",
                                  ConanApi::TextoRico(texto.c_str()),
                                  bool(true),    // positive
@@ -209,9 +216,9 @@ static void Falar(const Jogador& j, const std::string& texto)
         return;
     }
 
-    // Nenhum funcionou. Isto TEM de aparecer: uma loja que nao consegue
-    // responder e' uma loja que o jogador acha quebrada, e sem esta linha o
-    // dono do servidor nao teria por onde comecar.
+    // None of them worked. This HAS to show up: a shop that can't answer is a
+    // shop the player thinks is broken, and without this line the server owner
+    // would have nowhere to start.
     if (caminho != -1)
     {
         caminho = -1;
@@ -222,19 +229,20 @@ static void Falar(const Jogador& j, const std::string& texto)
     }
 }
 
-// Definidas no fim do arquivo (precisam de `Identificar`, que precisa de
-// `Jogador`), e usadas no meio. A declaracao antecipada evita reordenar o
-// arquivo inteiro so' para agradar o compilador.
+// Defined at the end of the file (they need `Identificar`, which needs
+// `Jogador`) and used in the middle. The forward declaration avoids reordering
+// the whole file just to please the compiler.
 namespace Shop
 {
     bool ResolverJogadorPorNome(const std::string& nome, std::string& id);
 }
 
-// ── a tela ──────────────────────────────────────────────────────────────────
+// ── the on-screen box ───────────────────────────────────────────────────────
 //
-// ClientShowMessageBox(Title: FText, Message: FText) — a caixa com botao que o
-// jogo ja' usa para avisos. O botao e' do JOGO: ele fecha, e nao ha como
-// transforma-lo em "proxima pagina". Por isso a paginacao e' por comando.
+// ClientShowMessageBox(Title: FText, Message: FText) — the box with a button
+// that the game already uses for notices. The button belongs to THE GAME: it
+// closes, and there's no way to turn it into "next page". That's why pagination
+// is done by command.
 static void MostrarNaTela(const Jogador& j, const std::string& titulo,
                           const std::string& corpo)
 {
@@ -244,22 +252,22 @@ static void MostrarNaTela(const Jogador& j, const std::string& titulo,
                          ConanApi::TextoRico(corpo.c_str()));
 }
 
-// ── a entrega ───────────────────────────────────────────────────────────────
+// ── delivery ────────────────────────────────────────────────────────────────
 //
 // ConanCharacter::SpawnTemplateItem(TemplateId, Context: FName, quantity,
 //                                   durabilityPercentage, durability,
 //                                   ShowNotification) -> bool
 //
-// O `Context` e' um FName, e e' por causa dele que o SDK ganhou ConanApi::Nome
-// em 20/08/2026: sem essa ponte, esta chamada — e portanto qualquer loja — era
-// impossivel de escrever com o SDK publico.
+// `Context` is an FName, and it's because of it that the SDK gained
+// ConanApi::Nome on 2026-08-20: without that bridge this call — and therefore
+// any shop at all — was impossible to write with the public SDK.
 static bool Entregar(const Jogador& j, const Shop::Item& item, std::string& porque)
 {
     void* corpo = MembroPonteiro(j.controller, "Character");
     if (!corpo) corpo = MembroPonteiro(j.controller, "Pawn");
     if (!corpo)
     {
-        porque = "sem personagem no mundo";
+        porque = "no character in the world";
         return false;
     }
 
@@ -268,25 +276,25 @@ static bool Entregar(const Jogador& j, const Shop::Item& item, std::string& porq
         int32_t(item.templateId),
         ConanApi::Nome(g_cfg.contexto.c_str()),
         int32_t(item.quantidade),
-        float(1.0f),      // durabilityPercentage: item novo
-        float(0.0f),      // durability: 0 = usa a do proprio item
-        bool(true));      // ShowNotification: o jogo avisa "voce recebeu"
+        float(1.0f),      // durabilityPercentage: a brand-new item
+        float(0.0f),      // durability: 0 = use the item's own
+        bool(true));      // ShowNotification: the game says "you received"
 
-    // Duas perguntas diferentes, e as duas importam:
-    //   UltimaChamadaExecutou() -> a funcao EXISTE e rodou nesta build
-    //   ok                      -> a funcao rodou e disse que conseguiu
-    // Sem a primeira, uma funcao renomeada num patch devolveria false e o log
-    // culparia o inventario cheio.
+    // Two different questions, and both matter:
+    //   UltimaChamadaExecutou() -> the function EXISTS and ran on this build
+    //   ok                      -> the function ran and said it succeeded
+    // Without the first, a function renamed in a patch would return false and
+    // the log would blame a full inventory.
     if (!g_api->UltimaChamadaExecutou())
     {
-        porque = "SpawnTemplateItem nao respondeu nesta build do jogo";
+        porque = "SpawnTemplateItem did not respond on this game build";
         return false;
     }
-    if (!ok) { porque = "o jogo recusou a entrega (inventario cheio?)"; return false; }
+    if (!ok) { porque = "the game refused the delivery (inventory full?)"; return false; }
     return true;
 }
 
-// ── os comandos ─────────────────────────────────────────────────────────────
+// ── the commands ────────────────────────────────────────────────────────────
 
 static bool PodeComprar(const Jogador& j, const Shop::Item& item)
 {
@@ -304,7 +312,8 @@ static void ComandoPontos(const Jogador& j)
     const int64_t s = Shop::Saldo(j.id);
     if (s < 0)
     {
-        // "voce tem 0 pontos" para quem tem 500 e' pior que dizer que caiu.
+        // Telling someone with 500 points that they have 0 is worse than
+        // telling them the shop is down.
         Falar(j, "A loja esta fora do ar (o banco nao respondeu). Avise um administrador.");
         return;
     }
@@ -314,8 +323,8 @@ static void ComandoPontos(const Jogador& j)
 
 static void ComandoLoja(const Jogador& j, int pagina)
 {
-    // Monta so' o que o jogador PODE comprar: listar o que ele nao pode e
-    // recusar depois e' fazer a pessoa tentar para descobrir.
+    // Builds only what the player CAN buy: listing what they can't and refusing
+    // afterwards makes the person try in order to find out.
     std::vector<const Shop::Item*> visiveis;
     for (const Shop::Item& i : g_cfg.itens)
         if (PodeComprar(j, i)) visiveis.push_back(&i);
@@ -381,9 +390,9 @@ static void ComandoComprar(const Jogador& j, const std::string& chave, int quant
 
     const int64_t custo = item->preco * quantas;
 
-    // O personagem e' conferido ANTES do debito. Debitar e descobrir que nao ha'
-    // onde entregar obriga a devolver — e toda devolucao e' uma chance a mais de
-    // algo dar errado no meio.
+    // The character is checked BEFORE the debit. Debiting and then finding
+    // there's nowhere to deliver forces a refund, and every refund is one more
+    // chance for something to go wrong in between.
     void* corpo = MembroPonteiro(j.controller, "Character");
     if (!corpo) corpo = MembroPonteiro(j.controller, "Pawn");
     if (!corpo)
@@ -415,7 +424,7 @@ static void ComandoComprar(const Jogador& j, const std::string& chave, int quant
     if (!Entregar(j, pedido, porque))
     {
         Shop::Devolver(j.id, custo, ("devolucao:" + item->chave + " (" + porque + ")").c_str());
-        g_api->Log("[shop] entrega falhou para %s (%s): %s — %lld ponto(s) devolvidos",
+        g_api->Log("[shop] delivery failed for %s (%s): %s — %lld point(s) refunded",
                    j.nome.c_str(), item->chave.c_str(), porque.c_str(), (long long)custo);
         Falar(j, g_cfg.Msg("entrega_falhou",
                            "Nao consegui entregar o item. Seus pontos foram devolvidos."));
@@ -430,10 +439,11 @@ static void ComandoComprar(const Jogador& j, const std::string& chave, int quant
                j.nome.c_str(), item->chave.c_str(), pedido.quantidade, (long long)custo);
 }
 
-// ── !shopdar <jogador> <qtd> — o admin dando pontos de dentro do jogo ───────
+// ── !shopdar <player> <amount> — an admin granting points from in game ──────
 //
-// Existe porque a fila por arquivo serve a automacao, e nao a quem esta jogando
-// e quer premiar alguem na hora. Protegido pela mesma permissao do reload.
+// It exists because the file queue serves automation, not someone who is
+// playing and wants to reward a person on the spot. Guarded by the same
+// permission as the reload.
 static bool EhAdmin(const Jogador& j)
 {
     const ConanPermApi* perm = ConanPermObter();
@@ -529,9 +539,10 @@ static void ComandoRecarregar(const Jogador& j)
         return;
     }
 
-    // O banco NAO e' reaberto aqui de proposito: trocar de banco com jogadores
-    // online trocaria as carteiras no meio de uma compra. Mudanca de banco pede
-    // reinicio, e isso esta dito no chat em vez de acontecer calado.
+    // The database is deliberately NOT reopened here: switching backends with
+    // players online would swap the wallets mid-purchase. Changing the backend
+    // calls for a restart, and that's said in chat instead of happening
+    // silently.
     const bool bancoMudou = (nova.banco.mysql != g_cfg.banco.mysql);
     const size_t quantos = nova.itens.size();
     g_cfg = std::move(nova);
@@ -551,12 +562,13 @@ static void ComandoRecarregar(const Jogador& j)
                j.nome.c_str(), int(quantos));
 }
 
-// ── o chat ──────────────────────────────────────────────────────────────────
+// ── chat ────────────────────────────────────────────────────────────────────
 
-// ChatRpcData::Message fica em 0x068 nesta build. Este e' o UNICO offset cru do
-// plugin, e ele esta aqui porque o parametro e' uma struct de RPC que a
-// reflexao nao decompoe. Foi medido, esta provado no ar pelo ExemploJogador, e
-// tem quem confira: se a build mudar, a API se recusa a carregar.
+// ChatRpcData::Message sits at 0x068 on this build. This is the plugin's ONLY
+// raw offset, and it's here because the parameter is an RPC struct that
+// reflection doesn't decompose. It was measured, it's proven live by
+// ExemploJogador, and something checks it: if the build changes, the API refuses
+// to load.
 static const uint32_t OFF_MENSAGEM_DO_CHAT = 0x068;
 
 extern "C" ConanAcao AoFalar(ConanChamada* c)
@@ -569,9 +581,9 @@ extern "C" ConanAcao AoFalar(ConanChamada* c)
     const std::string msg = texto;
     std::string resto;
 
-    // A identificacao so' acontece se a mensagem PARECER um comando nosso —
-    // ela custa uma consulta ao Permission, e o chat de um servidor cheio passa
-    // por aqui a cada linha digitada.
+    // Identification only happens if the message LOOKS like one of our commands.
+    // It costs a Permission lookup, and on a busy server every typed line comes
+    // through here.
     const bool nosso =
         msg.compare(0, g_cfg.cmdLoja.size(), g_cfg.cmdLoja) == 0 ||
         msg.compare(0, g_cfg.cmdComprar.size(), g_cfg.cmdComprar) == 0 ||
@@ -616,11 +628,11 @@ extern "C" ConanAcao AoFalar(ConanChamada* c)
     return CONAN_CONTINUAR;
 }
 
-// ── o credito por tempo ─────────────────────────────────────────────────────
+// ── timed points ────────────────────────────────────────────────────────────
 //
-// Um unico agendamento varre quem esta online, em vez de um temporizador por
-// jogador. Com 30 jogadores sao 30 tarefas contra uma — e a lista de online e'
-// lida do mundo, entao ninguem fica recebendo pontos depois de sair.
+// A single scheduled task sweeps whoever is online, rather than one timer per
+// player. With 30 players that's 30 tasks against one — and the online list is
+// read from the world, so nobody keeps earning points after leaving.
 static void CreditarOnline(void*)
 {
     if (!g_cfg.pontosLigados || g_cfg.pontosPorGrupo.empty()) return;
@@ -636,9 +648,10 @@ static void CreditarOnline(void*)
         Jogador j;
         if (!Identificar(pcs[i], j)) continue;
 
-        // Quanto este jogador ganha: o maior valor entre os grupos dele, ou a
-        // soma, conforme "somar". Sem Permission, cai no grupo "default" — e o
-        // servidor sem Permission ainda funciona, so' sem VIP.
+        // How much this player earns: the highest value among their groups, or
+        // the sum, depending on "somar". Without Permission they fall into the
+        // "default" group, and a server without Permission still works, just
+        // without VIP.
         int64_t quanto = 0;
         bool achouGrupo = false;
 
@@ -673,10 +686,11 @@ static void CreditarOnline(void*)
 
 static void LogDoBanco(const char* linha) { if (g_api) g_api->Log("%s", linha); }
 
-// ── o que o modulo de comandos precisa da loja ──────────────────────────────
+// ── what the commands module needs from the shop ────────────────────────────
 //
-// Tres funcoes, e nada mais. A fila administra pontos e recarrega config; nao
-// precisa (nem deve) alcancar o resto do plugin.
+// Three functions, and nothing else. The queue administers points and reloads
+// the config; it doesn't need (and shouldn't have) reach into the rest of the
+// plugin.
 namespace Shop
 {
     const ConanApiTabela* ApiDaLoja()   { return g_api; }
@@ -725,8 +739,8 @@ void ConanPluginCarregar(const ConanApiTabela* api)
     std::string erro;
     if (!Shop::LerConfig(g_caminhoConfig.c_str(), g_cfg, erro))
     {
-        // Nao subir e' proposital. Uma loja com configuracao ruim cobra pontos
-        // e nao entrega — pior que loja nenhuma.
+        // Refusing to start is deliberate. A shop with a bad configuration
+        // charges points and delivers nothing, which is worse than no shop.
         g_api->Log("[shop] NAO SUBI: %s", erro.c_str());
         g_api->Log("[shop] arquivo: %s", g_caminhoConfig.c_str());
         return;
@@ -758,10 +772,10 @@ void ConanPluginCarregar(const ConanApiTabela* api)
         g_api->Log("[shop] pontos: a cada %d minuto(s)", g_cfg.pontosMinutos);
     }
 
-    // ── a porta de fora do jogo ─────────────────────────────────────────────
+    // ── the door from outside the game ──────────────────────────────────────
     //
-    // O RCON do Conan nao aceita comando de plugin (medido: ver Comandos.h).
-    // Esta fila e' o caminho para painel web, script e SSH darem pontos.
+    // Conan's RCON doesn't accept plugin commands (measured: see Comandos.h).
+    // This queue is how a web panel, a script or SSH grant points.
     if (const char* raiz = g_api->CaminhoRaiz())
     {
         Shop::DefinirCaminhos(raiz);
