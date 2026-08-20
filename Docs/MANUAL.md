@@ -42,8 +42,8 @@ Pronto. Sobe o servidor e a loja está no ar.
 |---|---|---|
 | `!shop` | todos | mostra a lista na tela |
 | `!shop 2` | todos | página 2 |
-| `!comprar pedra` | todos | compra e entrega no inventário |
-| `!comprar pedra 3` | todos | compra 3 vezes |
+| `!comprar stone` | todos | compra e entrega no inventário |
+| `!comprar stone 3` | todos | compra 3 vezes |
 | `!pontos` | todos | mostra o saldo |
 | `!shopajuda` | todos | lembra os comandos |
 | `!shopdar Fulano#123 500` | admin | dá pontos a alguém |
@@ -152,7 +152,7 @@ procurar.
 ### Itens
 
 ```json
-"pedra": {
+"stone": {
   "nome": "Pedra",
   "categoria": "recurso",
   "template_id": 10001,
@@ -161,7 +161,7 @@ procurar.
 }
 ```
 
-A chave (`pedra`) é o que o jogador digita: `!comprar pedra`.
+A chave (`stone`) é o que o jogador digita: `!comprar stone`.
 
 `"permissao": "shop.vip"` (opcional) restringe o item — e ele nem aparece na
 lista de quem não pode, em vez de aparecer e ser recusado na hora da compra.
