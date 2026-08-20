@@ -45,7 +45,7 @@ namespace
     {
         int         linha;
         std::string jogador, grupo;
-        bool        esperado;      // true = deve estar no grupo; false = deve ter saido
+        bool        esperado;      // true = should be in the group; false = should have left
     };
     std::vector<Pendente> g_pendentes;
 
@@ -104,9 +104,9 @@ void DefinirCaminhos(const std::string& raiz)
 const std::string& CaminhoDaFila()      { return g_fila; }
 const std::string& CaminhoDasRespostas(){ return g_respostas; }
 
-// Confirma, com o Permission, o que ficou pendente da passada anterior.
-// Devolve as linhas de resposta — que sao ACRESCENTADAS ao arquivo, para quem
-// automatiza ler o desfecho de cada pedido.
+// Confirms with Permission whatever was left pending from the previous pass.
+// Returns the reply lines, which are APPENDED to the file so that whoever
+// automates this reads the outcome of each request.
 static std::vector<std::string> ConfirmarPendentes()
 {
     std::vector<std::string> saida;
@@ -152,15 +152,15 @@ void AtenderFila()
 {
     if (g_fila.empty()) return;
 
-    // As confirmacoes vem ANTES do retorno por falta de arquivo: o pedido foi
-    // na passada passada, e o desfecho tem de sair mesmo que ninguem escreva
-    // nada novo agora.
+    // Confirmations come BEFORE returning for lack of a file: the request was
+    // made on an earlier pass, and its outcome has to come out even if nobody
+    // writes anything new now.
     const std::vector<std::string> confirmacoes = ConfirmarPendentes();
 
     FILE* f = std::fopen(g_fila.c_str(), "rb");
     if (!f)
     {
-        if (confirmacoes.empty()) return;   // o caso comum: nada a fazer
+        if (confirmacoes.empty()) return;   // the common case: nothing to do
         // Confirmations only: APPENDS to the replies file, so the "enqueued"
         // line the owner just read isn't wiped.
         FILE* r = std::fopen(g_respostas.c_str(), "ab");
@@ -180,7 +180,7 @@ void AtenderFila()
     }
     std::fclose(f);
 
-    // ── APAGAR ANTES DE EXECUTAR ────────────────────────────────────────────
+    // ── DELETE BEFORE EXECUTING ─────────────────────────────────────────────
     //
     // If the server dies midway through a "give 500 points", the queue must not
     // still be there on the way back to do it again. Losing a command is
@@ -282,8 +282,8 @@ void AtenderFila()
                 continue;
             }
 
-            // `expira_em` = 0 significa nunca. Um quarto campo, se vier, sao os
-            // DIAS de duracao — que e' como se vende VIP de verdade.
+            // `expira_em` = 0 means never. A fourth field, if present, is the
+            // duration in DAYS, which is how VIP is actually sold.
             int64_t expira = 0;
             if (verbo == "grupo" && p.size() >= 4)
             {
@@ -394,10 +394,10 @@ void AtenderFila()
         }
         else if (verbo == "definir")
         {
-            // Definir e' credito ou debito conforme a diferenca. Nao ha um
-            // "SET pontos = N" solto de proposito: passar por Creditar/Debitar
-            // mantem o diario completo, e e' o diario que responde quando o
-            // jogador reclamar.
+            // Setting is a credit or a debit depending on the difference.
+            // There's deliberately no loose "SET pontos = N": going through
+            // Creditar/Debitar keeps the ledger complete, and it's the ledger
+            // that answers when a player complains.
             const int64_t atual = Saldo(id);
             if (atual < 0)
                 std::snprintf(resp, sizeof(resp),

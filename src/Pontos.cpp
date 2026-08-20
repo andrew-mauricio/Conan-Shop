@@ -267,7 +267,7 @@ namespace
 
     void Anotar(const std::string& jogador, int64_t delta, const char* motivo)
     {
-        // O diario nunca derruba a operacao: perder uma linha de historico e'
+        // The ledger never fails the operation: losing a line of history is
         // bad, refusing a credit because the history failed would be worse.
         if (g_mysql)
         {
@@ -331,7 +331,7 @@ int64_t Saldo(const std::string& jogador)
                 if (n > 0 && v[0]) { x->v = std::strtoll(v[0], nullptr, 10); x->achou = true; }
             }, &ctx, err, sizeof(err));
         if (!ok) { Registrar("[shop] saldo: %s", err); return -1; }
-        return ctx.achou ? ctx.v : 0;   // jogador ainda sem linha tem zero
+        return ctx.achou ? ctx.v : 0;   // a player with no row yet has zero
     }
 
     if (!g_db) return -1;
@@ -356,7 +356,7 @@ bool Creditar(const std::string& jogador, int64_t quanto, const char* motivo)
     if (g_mysql)
     {
         char sql[384], err[512];
-        // Um corte ANTES do WHERE creditaria a carteira de TODO MUNDO.
+        // A cut BEFORE the WHERE would credit EVERYONE's wallet.
         if (!MontarSql(sql, sizeof(sql),
                 "UPDATE carteira SET pontos = pontos + %lld WHERE jogador=%s;",
                 (long long)quanto, Perm::MySqlCliente::Citar(jogador.c_str()).c_str()))
@@ -399,7 +399,7 @@ Gasto Debitar(const std::string& jogador, int64_t quanto, const char* motivo)
                 Perm::MySqlCliente::Citar(jogador.c_str()).c_str(), (long long)quanto))
             return Gasto::Erro;
 
-        // O truncamento e' recusado dentro do MontarSql, acima — e ele diz no
+        // Truncation is refused inside MontarSql, above, and it says in the
         // log which statement didn't fit. Why that's fatal here is explained at
         // its definition.
         if (!g_my->Executar(sql, err, sizeof(err)))
@@ -431,7 +431,7 @@ Gasto Debitar(const std::string& jogador, int64_t quanto, const char* motivo)
 
 bool Devolver(const std::string& jogador, int64_t quanto, const char* motivo)
 {
-    // Devolucao tambem abate o `gasto`, senao a estatistica de quanto o jogador
+    // A refund also reduces `gasto`, otherwise the statistic of how much a
     // spent would start counting purchases that never happened.
     if (jogador.empty() || quanto <= 0) return false;
     {

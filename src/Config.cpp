@@ -11,7 +11,7 @@ namespace Shop
 {
 namespace
 {
-    // ── o JSON, lido pelo json1 num SQLite de memoria ───────────────────────
+    // ── the JSON, parsed by json1 in an in-memory SQLite ────────────────────
     class Json
     {
     public:
@@ -29,9 +29,9 @@ namespace
             return true;
         }
 
-        // json_valid ANTES de qualquer extracao. Sem isto, um arquivo com uma
-        // virgula a mais devolve NULL em cada campo e a loja sobe vazia,
-        // "com sucesso".
+        // json_valid BEFORE any extraction. Without it, a file with one comma
+        // too many returns NULL for every field and the shop comes up empty,
+        // "successfully".
         bool Valido(const std::string& t)
         {
             sqlite3_stmt* st = nullptr;
@@ -141,8 +141,8 @@ namespace
         return true;
     }
 
-    // O nome da chave de um item vira comando de chat. Recusar aqui e' melhor
-    // que aceitar e o jogador nunca conseguir digitar.
+    // An item's key becomes a chat command. Refusing here is better than
+    // accepting it and having the player never manage to type it.
     bool ChaveUsavel(const std::string& k, std::string& porque)
     {
         if (k.empty()) { porque = "chave vazia"; return false; }
@@ -212,9 +212,9 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
         else if (tipo == "mysql" || tipo == "mariadb") c.banco.mysql = true;
         else
         {
-            // Recusa deliberada: cair no local depois de o dono escrever
-            // "mysqll" mandaria os pontos para um arquivo que ele nunca vai
-            // procurar.
+            // A deliberate refusal: falling back to local after the owner
+            // typed "mysqll" would send the points to a file they will never
+            // go looking for.
             erro = "banco.tipo = \"" + tipo + "\" nao existe. Use \"local\" ou \"mysql\".";
             return false;
         }
@@ -320,8 +320,8 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
     {
         CtxItens ctx{ &j, &c, &erro, 0 };
         std::string e;
-        // json_each devolve o VALOR de cada item como texto JSON; o objeto de
-        // cada um e' relido com json_extract sobre esse texto.
+        // json_each returns each item's VALUE as JSON text; each object is then
+        // re-read with json_extract over that text.
         struct Passagem
         {
             static void Uma(const char* chave, const char* valorJson, void* p)

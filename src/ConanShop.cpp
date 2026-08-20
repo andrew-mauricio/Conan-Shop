@@ -192,8 +192,8 @@ static void Falar(const Jogador& j, const std::string& texto)
                                  float(8.0f));
             return g_api->UltimaChamadaExecutou() != 0;
         case 3:
-            // O caminho antigo, pelo CheatManager. Precisa do NOME, entao so'
-            // vale se ele foi lido.
+            // The old route, through the CheatManager. It needs the NAME, so
+            // it only applies if that was read.
             if (j.nome.empty()) return false;
             return g_api->MensagemParaJogador(j.nome.c_str(), texto.c_str()) != 0;
         }
@@ -299,7 +299,7 @@ static bool Entregar(const Jogador& j, const Shop::Item& item, std::string& porq
 static bool PodeComprar(const Jogador& j, const Shop::Item& item)
 {
     const ConanPermApi* perm = ConanPermObter();
-    if (!perm || !perm->tem) return true;   // sem Permission, sem restricao
+    if (!perm || !perm->tem) return true;   // no Permission, no restriction
     if (!g_cfg.permComprar.empty() &&
         perm->tem(j.id.c_str(), g_cfg.permComprar.c_str()) != 1) return false;
     if (!item.permissao.empty() &&
@@ -460,9 +460,9 @@ static void ComandoDar(const Jogador& j, const std::string& resto)
         return;
     }
 
-    // "<nome> <qtd>" — o nome pode ter espaco? Nao: o nome do Conan e'
-    // "Indio#76973", sem espaco. Partir no ULTIMO espaco cobre os dois casos
-    // sem precisar de aspas.
+    // "<name> <amount>" — can the name contain a space? No: a Conan name is
+    // "Indio#76973", with none. Splitting on the LAST space covers both cases
+    // without needing quotes.
     const size_t esp = resto.rfind(' ');
     if (esp == std::string::npos || esp + 1 >= resto.size())
     {
@@ -480,7 +480,7 @@ static void ComandoDar(const Jogador& j, const std::string& resto)
     std::string id;
     if (!Shop::ResolverJogadorPorNome(quem, id))
     {
-        // Pode ser que ele tenha digitado o id direto.
+        // They may have typed the id directly.
         if (quem.find('#') == std::string::npos) id = quem;
         else
         {
@@ -500,8 +500,8 @@ static void ComandoDar(const Jogador& j, const std::string& resto)
     g_api->Log("[shop] %s deu %lld ponto(s) a %s",
                j.nome.c_str(), (long long)quanto, id.c_str());
 
-    // Avisa quem recebeu, se estiver online — receber pontos em silencio deixa
-    // o jogador achando que o admin esqueceu.
+    // Tell the recipient, if they're online: receiving points in silence leaves
+    // the player thinking the admin forgot them.
     Jogador alvo;
     void* pcs[128];
     const int n = g_api->FindObjects("ConanPlayerController", pcs, 128, 1);
@@ -705,9 +705,10 @@ namespace Shop
         return true;
     }
 
-    // O dono tem o NOME na mao (e' o que o `listplayers` do RCON mostra); o
-    // banco guarda o ID da conta. Esta e' a ponte, e ela so' funciona com o
-    // jogador ONLINE — o que a resposta da fila diz, em vez de falhar calado.
+    // The owner has the NAME in hand (it's what RCON's `listplayers` shows);
+    // the database stores the account ID. This is the bridge, and it only works
+    // while the player is ONLINE, which the queue's reply says rather than
+    // failing quietly.
     bool ResolverJogadorPorNome(const std::string& nome, std::string& id)
     {
         void* pcs[128];
