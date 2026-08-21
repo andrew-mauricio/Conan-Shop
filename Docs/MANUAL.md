@@ -1,74 +1,77 @@
 # Conan Shop
 
-Loja por pontos para Conan Exiles Enhanced. O jogador ganha pontos por tempo
-online, vê a lista com `!shop` e compra com `!comprar`. VIP ganha mais, e quem
-manda nisso é o seu `permission.json`.
+*Portuguese translation: [MANUAL.pt.md](MANUAL.pt.md)*
 
-É o mesmo desenho do **ArkShop**, que muita gente já conhece do ARK e do ASA —
-adaptado ao Conan, que funciona diferente por dentro (veja
-[Um item não é uma blueprint](#um-item-não-é-uma-blueprint)).
+A points shop for Conan Exiles Enhanced. Players earn points for time online,
+see the list with `!shop` and buy with `!comprar`. VIPs earn more, and what
+decides that is your `permission.json`.
+
+It's the same design as **ArkShop**, which plenty of people already know from
+ARK and ASA — adapted to Conan, which works differently underneath (see
+[An item is not a blueprint](#an-item-is-not-a-blueprint)).
 
 ---
 
-## Instalar
+## Installing
 
-Copie a pasta `ConanShop` inteira para dentro de:
+Copy the whole `ConanShop` folder into:
 
 ```
-<servidor>/ConanSandbox/Binaries/Win64/Conan-Api/Plugins/
+<server>/ConanSandbox/Binaries/Win64/Conan-Api/Plugins/
 ```
 
-A pasta tem quatro coisas — e três já vêm no pacote:
+The folder holds four things, and three of them ship in the package:
 
 ```
 Conan-Api/Plugins/ConanShop/
-   ConanShop.dll        o plugin
-   PluginInfo.json      o que a API lê para saber quem ele é
-   config.json          o que VOCÊ edita
-   conanshop.db         nasce sozinho na primeira vez (é o banco dos pontos)
+   ConanShop.dll        the plugin
+   PluginInfo.json      what the API reads to know what it is
+   config.json          what YOU edit
+   conanshop.db         born on its own the first time (the points database)
 ```
 
-**O Permission é obrigatório.** É dele que vem a identidade do jogador (a chave
-da carteira) e a noção de VIP. Sem ele o plugin sobe, avisa no log e não
-consegue identificar ninguém.
+**Permission is required.** It's where the player's identity comes from (the
+wallet's key) and where VIP status comes from. Without it the plugin loads,
+says so in the log, and can't identify anybody.
 
-Pronto. Sobe o servidor e a loja está no ar.
+That's it. Start the server and the shop is live.
 
 ---
 
-## Os comandos
+## The commands
 
-| no chat | quem pode | o que faz |
+| in chat | who can | what it does |
 |---|---|---|
-| `!shop` | todos | mostra a lista na tela |
-| `!shop 2` | todos | página 2 |
-| `!comprar stone` | todos | compra e entrega no inventário |
-| `!comprar stone 3` | todos | compra 3 vezes |
-| `!pontos` | todos | mostra o saldo |
-| `!shopajuda` | todos | lembra os comandos |
-| `!shopdar Fulano#123 500` | admin | dá pontos a alguém |
-| `!shopreload` | admin | relê o `config.json` |
+| `!shop` | everyone | shows the list on screen |
+| `!shop 2` | everyone | page 2 |
+| `!comprar pedra` | everyone | buys and delivers to the inventory |
+| `!comprar pedra 3` | everyone | buys three times |
+| `!pontos` | everyone | shows the balance |
+| `!shopajuda` | everyone | reminds you of the commands |
+| `!shopdar Fulano#123 500` | admin | gives somebody points |
+| `!shopreload` | admin | re-reads `config.json` |
 
-Todos podem ser renomeados no `config.json`, em `"comandos"`.
+All of them can be renamed in `config.json`, under `"comandos"`.
 
-### A tela do `!shop`
+### The `!shop` screen
 
-A lista aparece na caixa de mensagem do jogo — aquela com um botão embaixo.
+The list appears in the game's message box, the one with a button underneath.
 
-**O botão é do jogo e só fecha.** Não dá para transformá-lo em "próxima
-página": ele não é nosso. A paginação é por comando: `!shop 2`, `!shop 3`. O
-rodapé da lista lembra disso ao jogador.
+**The button belongs to the game and only closes.** There's no turning it into
+"next page": it isn't ours. Paging is by command: `!shop 2`, `!shop 3`. The
+list's footer reminds the player of that.
 
-Se preferir a lista no chat em vez da tela, ponha `"usar_tela": false`.
+If you'd rather have the list in chat instead of on screen, set
+`"usar_tela": false`.
 
 ---
 
-## Dar pontos de fora do jogo
+## Giving points from outside the game
 
-Painel web, script, tarefa agendada, SSH. Escreva linhas em:
+A web panel, a script, a scheduled task, SSH. Write lines into:
 
 ```
-<servidor>/ConanSandbox/Binaries/Win64/Conan-Api/SHOP-COMANDOS
+<server>/ConanSandbox/Binaries/Win64/Conan-Api/SHOP-COMANDOS
 ```
 
 ```
@@ -79,7 +82,7 @@ saldo   Indio#76973
 recarregar
 ```
 
-O plugin atende em até 3 segundos e responde, linha por linha, em
+The plugin picks them up within 3 seconds and answers, line by line, in
 `Conan-Api/SHOP-RESPOSTAS`:
 
 ```
@@ -88,34 +91,35 @@ linha 1: ok dar A-4QR7CRS0F +500 (saldo 1250)
 linha 2: RECUSADO tirar A-9XX -100 — saldo insuficiente (tem 40). NADA foi tirado.
 ```
 
-O jogador pode ser identificado pelo **nome de exibição** (só funciona com ele
-online — a resposta diz isso) ou pelo **id da conta**, que funciona sempre.
+The player can be identified by **display name** (which only works while they're
+online — the answer says so) or by **account id**, which always works.
 
-### Por que não é um comando de RCON
+### Why this isn't an RCON command
 
-Porque não pode ser, e isso foi **medido**, não suposto:
+Because it can't be, and that was **measured**, not assumed:
 
-- O RCON do Conan aceita uma lista fixa de comandos (`help` mostra:
-  `listplayers`, `broadcast`, `con`, `exec`, `sql`, `KickPlayer`…). Não existe
-  registro de comando novo — a AsaApi tem `AddRconCommand`, o Conan não expõe
-  equivalente.
-- A esperança seguinte era pegar carona: `broadcast <texto>` chama
-  `ConanCheatManager::BroadcastMessage`, que **é** uma UFunction e portanto
-  seria hookável. Foi testado com cinco hooks armados ao mesmo tempo. O servidor
-  respondeu *"Message has been broadcast."* e **nenhum disparou**. O caminho do
-  RCON é nativo e não passa pela reflexão do jogo.
-- E `exec` sem argumento **derruba o servidor** (access violation — bug do
-  Conan, não do plugin). Não mande.
+- Conan's RCON takes a fixed list of commands (`help` shows: `listplayers`,
+  `broadcast`, `con`, `exec`, `sql`, `KickPlayer`…). There's no registering a new
+  one — AsaApi has `AddRconCommand`, Conan exposes no equivalent.
+- The next hope was to hitch a ride: `broadcast <text>` calls
+  `ConanCheatManager::BroadcastMessage`, which **is** a UFunction and so ought to
+  be hookable. It was tested with five hooks armed at once. The server answered
+  *"Message has been broadcast."* and **none of them fired**. RCON's path is
+  native and doesn't go through the game's reflection.
+- And `exec` with no argument **takes the server down** (an access violation — a
+  Conan bug, not the plugin's). Don't send it.
 
-O arquivo é a porta que sobrou, e é a que toda automação já sabe abrir.
+The file is the door that was left, and it's the one every automation already
+knows how to open.
 
 ---
 
-## O `config.json`
+## The `config.json`
 
-O arquivo é comentado por dentro (as chaves `_leia_isto`). O resumo:
+The file is commented from the inside (the `_leia_isto` keys). The short
+version:
 
-### Pontos
+### Points
 
 ```json
 "pontos": {
@@ -126,33 +130,34 @@ O arquivo é comentado por dentro (as chaves `_leia_isto`). O resumo:
 }
 ```
 
-Os nomes em `grupos` são as **chaves dos grupos do seu `permission.json`**.
+The names under `grupos` are the **group keys from your `permission.json`**.
 
-`"somar": false` (padrão) dá ao jogador o **maior** valor entre os grupos dele —
-um VIP que também está em `default` ganha 15, não 20. `true` soma.
+`"somar": false` (the default) gives the player the **highest** value among
+their groups — a VIP who is also in `default` earns 15, not 20. `true` adds them
+up.
 
-Com o padrão (5 pontos a cada 5 minutos), um jogador comum faz **60 pontos por
-hora**. É a régua para ler os preços.
+With the defaults (5 points every 5 minutes), an ordinary player makes **60
+points an hour**. That's the ruler for reading the prices.
 
-### Banco
+### Database
 
-`"tipo": "local"` guarda num arquivo ao lado do plugin. Não precisa instalar
-nada e é o certo para quase todo mundo.
+`"tipo": "local"` keeps it in a file beside the plugin. Nothing to install, and
+it's the right answer for almost everybody.
 
-`"tipo": "mysql"` só para quem roda **vários servidores** e quer os pontos
-valendo em todos. Aí `mysql_usuario` e `mysql_banco` passam a ser obrigatórios —
-e se estiverem vazios o plugin **não sobe**, de propósito: cair no local calado
-mandaria os pontos dos seus jogadores para um arquivo que você nunca vai
-procurar.
+`"tipo": "mysql"` is only for people running **several servers** who want points
+to count on all of them. Then `mysql_usuario` and `mysql_banco` become
+mandatory — and if they're empty the plugin **won't come up**, on purpose:
+quietly falling back to local would send your players' points into a file you're
+never going to look at.
 
-> Apagar o banco local exige apagar também `conanshop.db-wal` e
-> `conanshop.db-shm`. Sem isso o dado **ressuscita** na próxima abertura e o
-> apagamento parece feito.
+> Deleting the local database means deleting `conanshop.db-wal` and
+> `conanshop.db-shm` too. Without that the data **comes back** on the next open
+> and the deletion only looked like it happened.
 
-### Itens
+### Items
 
 ```json
-"stone": {
+"pedra": {
   "nome": "Pedra",
   "categoria": "recurso",
   "template_id": 10001,
@@ -161,229 +166,244 @@ procurar.
 }
 ```
 
-A chave (`stone`) é o que o jogador digita: `!comprar stone`.
+The key (`pedra`) is what the player types: `!comprar pedra`.
 
-`"permissao": "shop.vip"` (opcional) restringe o item — e ele nem aparece na
-lista de quem não pode, em vez de aparecer e ser recusado na hora da compra.
+`"permissao": "shop.vip"` (optional) restricts the item — and it doesn't even
+appear in the list for somebody who can't buy it, rather than appearing and
+being refused at purchase time.
 
 ---
 
-## Um item não é uma blueprint
+## An item is not a blueprint
 
-Esta é a diferença que mais dá trabalho para quem vem do ARK.
+This is the difference that gives ARK people the most trouble.
 
-No ARK vale *"uma blueprint = um item"*, e a loja guarda o caminho da blueprint.
-**No Conan não.** O que identifica um item é o **Template ID** — o *Row Name* da
-tabela `/Game/Items/ItemTable`, que é a tabela canônica da Funcom.
+In ARK *"one blueprint = one item"* holds, and the shop stores the blueprint's
+path. **In Conan it doesn't.** What identifies an item is the **Template ID** —
+the *Row Name* of the `/Game/Items/ItemTable` table, which is Funcom's canonical
+table.
 
-O campo `ItemClass` daquela linha aponta para a blueprint, mas ele **não é
-único**:
+That row's `ItemClass` field points at the blueprint, but it is **not unique**:
 
 | item | ID | ItemClass |
 |---|---|---|
-| Stone | 10001 | `/Script/ConanSandbox.GameItem` ← classe nativa, compartilhada |
-| Brimstone | 14171 | `/Script/ConanSandbox.GameItem` ← **a mesma** |
+| Stone | 10001 | `/Script/ConanSandbox.GameItem` ← native class, shared |
+| Brimstone | 14171 | `/Script/ConanSandbox.GameItem` ← **the same one** |
 | Katana | 51091 | `/Game/Items/Weapons/Katana2h/BP_Item_KatanaBase…` |
 
-Centenas de itens simples dividem a mesma classe nativa. Uma loja modelada por
-blueprint entregaria o item errado para toda essa família — e **funcionando**,
-sem um erro sequer no log.
+Hundreds of simple items share that same native class. A shop modelled on
+blueprints would deliver the wrong item for that whole family — and it would
+**work**, without a single error in the log.
 
-Por isso o `config.json` vende por `template_id`, sempre.
+That's why `config.json` always sells by `template_id`.
 
 ---
 
-## De onde vem a lista de itens
+## Where the item list comes from
 
-Do plugin **ExtratorItemTable**, que acompanha a Conan-Api. Com o servidor já
-carregado, crie o arquivo:
-
-```
-<servidor>/ConanSandbox/Binaries/Win64/Conan-Api/EXTRAIR-ITEMTABLE
-```
-
-Ele lê a `/Game/Items/ItemTable` inteira e grava, ao lado do plugin:
+From the **ExtratorItemTable** plugin, which ships with Conan-Api. With the
+server already loaded, create the file:
 
 ```
-itemtable-conan.json     para programa
-itemtable-conan.csv      para planilha (com BOM: o Excel acerta o acento sozinho)
+<server>/ConanSandbox/Binaries/Win64/Conan-Api/EXTRAIR-ITEMTABLE
 ```
 
-Nesta build (24784646) são **9.121 itens × 120 colunas**, com `Name`,
-`GUICategory`, `ItemClass`, `ItemTier`, `DLCPackage`, `MaxStackSize` e o resto.
+It reads all of `/Game/Items/ItemTable` and writes, beside the plugin:
 
-Ele **não** depende de alguém ter aberto um baú: lê a tabela, não os objetos
-carregados. Um extrator que varre o mundo devolve uma lista curta que *parece*
-completa — foi o que aconteceu na primeira tentativa deste projeto: 27 itens,
-todos com Template ID zero, num mundo de 786.927 objetos.
+```
+itemtable-conan.json     for a program
+itemtable-conan.csv      for a spreadsheet (with a BOM, so Excel gets the accents right on its own)
+```
 
-Para transformar isso num catálogo de loja:
+On this build (24784646) that's **9,121 items × 120 columns**, with `Name`,
+`GUICategory`, `ItemClass`, `ItemTier`, `DLCPackage`, `MaxStackSize` and the
+rest.
+
+It does **not** depend on somebody having opened a chest: it reads the table, not
+the loaded objects. An extractor that sweeps the world returns a short list that
+*looks* complete — which is what happened on this project's first attempt: 27
+items, all with Template ID zero, in a world of 786,927 objects.
+
+To turn that into a shop catalogue:
 
 ```bash
 tools/montar_catalogo_loja.py itemtable-conan.json --max-por-categoria 12 -o itens.json
 ```
 
-O script **diz o que deixou de fora e por quê** (itens de DLC, decoração,
-linhas de teste), e a conta fecha com o total — corte silencioso vira "a loja
-está incompleta e não sei por quê".
+The script **says what it left out and why** (DLC items, decoration, test rows),
+and the arithmetic adds up to the total — a silent cut turns into "the shop is
+incomplete and I don't know why".
 
 ---
 
-## O que este plugin protege, e como
+## What this plugin protects, and how
 
-### Ninguém gasta o que não tem, nem duas vezes
+### Nobody spends what they don't have, or spends it twice
 
-O débito é **um único UPDATE com a condição de saldo dentro dele**:
+The debit is **a single UPDATE with the balance condition inside it**:
 
 ```sql
 UPDATE carteira SET pontos = pontos - ? WHERE jogador = ? AND pontos >= ?
 ```
 
-Quem decide é o banco, uma vez, sob a trava dele. Não há intervalo entre "ler o
-saldo" e "gastar", porque não se lê antes de gastar. Se a linha não mudou, não
-havia saldo — e isso é uma **resposta do banco**, não uma suposição.
+The database decides, once, under its own lock. There's no gap between "read the
+balance" and "spend it", because nothing is read before spending. If the row
+didn't change, there was no balance — and that's an **answer from the database**,
+not an assumption.
 
-Isso está medido. Oito clientes simultâneos, 400 tentativas de compra disputando
-saldo para exatamente 20:
+This is measured. Eight simultaneous clients, 400 purchase attempts fighting over
+a balance of exactly 20:
 
-| implementação | passaram | saldo final |
+| implementation | went through | final balance |
 |---|---|---|
-| checagem fora do UPDATE (o padrão do ArkShop) | **26** | **−60** |
-| condição dentro do UPDATE (este plugin) | **20** | **0** |
+| check outside the UPDATE (ArkShop's pattern) | **26** | **−60** |
+| condition inside the UPDATE (this plugin) | **20** | **0** |
 
-O teste roda com `testes/rodar.sh`, e há um `controle_positivo` que prova que o
-teste **sabe reprovar**. Isso não é cerimônia: a primeira versão do teste
-passou, e o controle positivo a reprovou — havia um mutex no próprio teste, e
-ele apagava justamente a fresta que se queria medir. Com ele, até a
-implementação defeituosa passava com nota cheia. Enquanto o controle positivo
-não passar, o resto da bateria não significa nada.
+The test runs with `testes/rodar.sh`, and there's a `controle_positivo` that
+proves the test **knows how to fail**. That isn't ceremony: the first version of
+the test passed, and the positive control failed it — there was a mutex inside
+the test itself, and it erased exactly the gap we were trying to measure. With
+it there, even the broken implementation passed with full marks. Until the
+positive control passes, the rest of the suite means nothing.
 
-Isso importa de verdade quando você aponta dois servidores para o mesmo MySQL:
-lá não existe trava em comum entre os processos, e só o SQL segura.
-
-### Nenhum comando de dinheiro sai cortado
-
-Todo SQL passa por `MontarSql`, que **recusa a operação** se o comando não
-couber no buffer, em vez de truncar em silêncio como o `snprintf` faz.
-
-O motivo é específico: um corte no lugar errado produz um comando *válido* e
-*diferente do pretendido*. Cortar entre `WHERE jogador='...'` e
-`AND pontos >= N` deixa um UPDATE que o banco executa com prazer — **sem a
-condição de saldo**. No crédito é pior: um corte antes do `WHERE` credita a
-carteira de todo mundo.
-
-Com o id de conta limitado a 64 caracteres isso não acontece hoje. Mas "hoje não
-acontece" nunca foi garantia, e a proteção custa uma linha.
-
-### Configuração quebrada não substitui a boa
-
-Você edita o `config.json` às 21h, erra uma vírgula e manda `!shopreload`. O
-plugin **recusa** e continua com a configuração anterior, dizendo o motivo no
-chat.
-
-Sem isso, a loja ficaria vazia no horário de pico — sem erro visível, porque
-"zero itens" é um estado válido.
-
-### Se a entrega falhar, o ponto volta
-
-O débito acontece antes da entrega (é a única ordem segura). Se o jogo recusar
-o item, o plugin **devolve** e registra o motivo no diário e no log.
-
-### Todo movimento fica no diário
-
-A tabela `diario` guarda cada crédito e débito com data, valor e motivo. Quando
-um jogador disser *"comprei e não recebi"*, é ela que responde.
+This matters for real when you point two servers at the same MySQL: there's no
+lock shared between the processes there, and only the SQL holds.
 
 ---
 
-## O que este plugin NÃO resolve
+### No money command comes out truncated
 
-Declarado de propósito, porque limite conhecido é melhor que surpresa.
+All SQL goes through `MontarSql`, which **refuses the operation** if the command
+doesn't fit the buffer, instead of quietly truncating the way `snprintf` does.
 
-### O servidor caindo entre o débito e a entrega
+The reason is specific: a cut in the wrong place produces a command that is
+*valid* and *different from what was meant*. Cutting between
+`WHERE jogador='...'` and `AND pontos >= N` leaves an UPDATE the database is
+happy to run — **without the balance condition**. On a credit it's worse: a cut
+before the `WHERE` credits everybody's wallet.
 
-A ordem é: debita → entrega → se a entrega falhar, devolve. É a única ordem
-segura (entregar antes de cobrar deixaria o item de graça se o débito falhasse).
+With account ids capped at 64 characters that can't happen today. But "it can't
+happen today" was never a guarantee, and the protection costs one line.
 
-Mas se o **servidor cair exatamente no meio** — depois do débito, antes da
-entrega — o ponto sai e o item não chega, e não há nada rodando para devolver.
+### Broken configuration doesn't replace good configuration
 
-Resolver isso de verdade exigiria marcar a compra como pendente e reconciliar no
-arranque seguinte; é uma máquina de estados que não está aqui. O que existe:
+You edit `config.json` at 9pm, miss a comma and send `!shopreload`. The plugin
+**refuses** and carries on with the previous configuration, saying why in chat.
 
-- a janela é de milissegundos (entre duas chamadas seguidas);
-- o `diario` registra o débito com `compra:<item>`, então dá para ver o que
-  aconteceu e devolver à mão:
+Without that, the shop would sit empty through peak hours — with no visible
+error, because "zero items" is a valid state.
+
+### If delivery fails, the points come back
+
+The debit happens before delivery (it's the only safe order). If the game refuses
+the item, the plugin **refunds** and records why in the ledger and in the log.
+
+### Every movement is in the ledger
+
+The `diario` table keeps every credit and debit with a date, an amount and a
+reason. When a player says *"I bought it and didn't get it"*, that's what
+answers.
+
+---
+
+## What this plugin does NOT solve
+
+Stated on purpose, because a known limit beats a surprise.
+
+### The server dying between the debit and the delivery
+
+The order is: debit → deliver → refund if delivery fails. It's the only safe
+order (delivering before charging would hand out a free item if the debit
+failed).
+
+But if the **server dies exactly in between** — after the debit, before the
+delivery — the points go and the item doesn't arrive, and nothing is running to
+refund it.
+
+**This has not happened in production.** The shop has been running with real
+players buying: no crashes, no lost points, no wrong balances. The window is
+described here because it exists in the code, not because anybody has hit it.
+
+Solving it properly would mean marking the purchase pending and reconciling on
+the next startup; that's a state machine that isn't here. What does exist:
+
+- the window is milliseconds wide (between two consecutive calls);
+- the `diario` records the debit as `compra:<item>`, so you can see what happened
+  and refund by hand:
   ```
   dar Fulano#1234 50 estorno da queda de 20/08
   ```
 
-O ArkShop também não resolve isso.
+ArkShop doesn't solve this either.
 
-### Entrega parcial quando o inventário enche no meio
+### Partial delivery when the inventory fills mid-way
 
-`SpawnTemplateItem` recebe a quantidade inteira e responde sim ou não. Se o jogo
-entregar parte e recusar o resto, o plugin vê "sim" e cobra tudo. Não há como
-distinguir pelo retorno.
+`SpawnTemplateItem` takes the whole quantity and answers yes or no. If the game
+delivers part of it and refuses the rest, the plugin sees "yes" and charges for
+everything. There's no telling them apart from the return value.
 
-Mitigação: os itens são vendidos em quantidade que respeita o `MaxStackSize` da
-tabela, então a pilha cabe num slot. Ainda assim, comprar com o inventário quase
-cheio pode render menos do que o pago.
+Mitigation: items are sold in quantities that respect the table's
+`MaxStackSize`, so the stack fits one slot. Even so, buying with a nearly full
+inventory can yield less than you paid for.
 
-### Itens de DLC
+### DLC items — not tested
 
-O catálogo gerado exclui itens de DLC por padrão (`DLCPackage != None`), porque
-quem não tem o DLC compra e não recebe. Se você habilitar com `--com-dlc`, essa
-responsabilidade passa a ser sua — o plugin não tem como saber quais DLCs cada
-jogador possui.
+Delivery is proved for **vanilla items**: they all arrive. DLC items have not
+been tested, and until they are, this stays in the "not proved" column rather
+than the "works" one.
+
+The generated catalogue excludes them by default (`DLCPackage != None`) for a
+separate reason: somebody who doesn't own the DLC would buy and receive
+nothing. If you enable them with `--com-dlc`, that responsibility becomes yours
+— the plugin has no way of knowing which DLCs each player owns.
 
 ---
 
-## O que está provado, e como
+## What is proved, and how
 
-Este projeto não chama de pronto o que não foi visto funcionando. Tudo abaixo
-foi medido — nada é "deve funcionar".
+This project doesn't call something done that nobody has seen working.
+Everything below was measured; none of it is "it should work".
 
-| peça | estado |
+| piece | state |
 |---|---|
-| carteira, débito atômico, devolução | **provado** — teste automatizado com controle positivo |
-| leitura e recusa de `config.json` | **provado** — 8 casos, incluindo JSON válido com itens inválidos |
-| roteamento de comando (`!shop` × `!shopreload`) | **provado** — 11 casos de roteamento |
-| extração da ItemTable (9.121 itens) | **provado** no servidor, IDs conferidos contra fonte externa |
-| fila `SHOP-COMANDOS` | **provado** — 10 casos, incluindo os que devem falhar |
-| RCON **não** intercepta | **provado** — 5 hooks armados, nenhum disparou |
-| `!pontos` respondendo | **provado com jogador real** (20/08/2026) |
-| `!shop` desenhando a tela | **provado com jogador real** |
-| `!comprar` entregando o item | **provado com jogador real** — 100 pedras no inventário |
-| crédito por tempo | **provado com jogador real** — creditou durante o teste |
+| wallet, atomic debit, refund | **proved** — automated test with a positive control |
+| reading and refusing `config.json` | **proved** — 8 cases, including valid JSON holding invalid items |
+| command routing (`!shop` vs `!shopreload`) | **proved** — 11 routing cases |
+| ItemTable extraction (9,121 items) | **proved** on the server, IDs checked against an external source |
+| the `SHOP-COMANDOS` queue | **proved** — 10 cases, including the ones that must fail |
+| RCON does **not** intercept | **proved** — 5 hooks armed, none fired |
+| `!pontos` answering | **proved with a real player** (2026-08-20) |
+| `!shop` drawing the screen | **proved with a real player** |
+| `!comprar` delivering the item | **proved with a real player** — every vanilla item delivers; the first was 100 stone in the inventory |
+| credit for time online | **proved with a real player** — credited during the test |
 
-### O que o teste com jogador real achou, e que nenhum teste automatizado acharia
+### What the test with a real player found, and no automated test would
 
-A primeira versão **não respondia nada** ao jogador. O hook do chat disparava,
-lia o comando e cancelava a mensagem corretamente — e a resposta morria no
-caminho, sem uma linha no log.
+The first version **answered nothing** to the player. The chat hook fired, read
+the command and cancelled the message correctly — and the reply died on the way,
+without a line in the log.
 
-Duas causas, as duas invisíveis:
+Two causes, both invisible:
 
-1. `Falar()` desistia em silêncio quando o nome do jogador não tinha sido lido —
-   e `Identificar()` devolve sucesso com o nome vazio, desde que o Permission
-   tenha resolvido o id.
-2. Pior, era erro de desenho: a resposta procurava o jogador **pelo nome**, via
-   `CheatManager`, tendo o controller dele na mão.
+1. `Falar()` gave up silently when the player's name hadn't been read — and
+   `Identificar()` returns success with an empty name, as long as Permission
+   resolved the id.
+2. Worse, it was a design mistake: the reply looked the player up **by name**,
+   through `CheatManager`, with their controller already in hand.
 
-Hoje a resposta vai direto ao controller, tentando três caminhos em ordem
-(`ClientHUDShowNotification` → `ClientMessage` → `PlayerMessage`) e registrando
-qual funcionou. Na build 24784646, é o primeiro — o mesmo que o jogo usa para
-seus próprios avisos.
+Today the reply goes straight to the controller, trying three paths in order
+(`ClientHUDShowNotification` → `ClientMessage` → `PlayerMessage`) and recording
+which one worked. On build 24784646 it's the first, the same one the game uses
+for its own notices.
 
-*200 no curl não prova a tela.* Este defeito passou por bateria de testes,
-revisão adversarial e revisão de boa-fé sem aparecer. Só apareceu quando alguém
-digitou `!pontos` dentro do jogo.
+*A 200 from curl doesn't prove the screen.* This defect went through the test
+suite, an adversarial review and a good-faith review without showing up. It only
+showed up when somebody typed `!pontos` inside the game.
 
 ---
 
-## Licença
+## Licence
 
-Mesma da Conan-Api. Você pode usar em quantos servidores quiser, inclusive em
-servidor que cobra dos jogadores; e pode escrever e **vender** plugins seus em
-cima da API. O que não pode é revender ou re-hospedar a própria API.
+Same as Conan-Api's. You can run it on as many servers as you like, including
+servers that charge their players; and you can write and **sell** plugins of your
+own on top of the API. What you can't do is resell or re-host the API itself.

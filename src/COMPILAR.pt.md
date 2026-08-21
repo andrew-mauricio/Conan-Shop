@@ -1,5 +1,7 @@
 # Compilar do fonte
 
+*Tradução. O documento principal é o [COMPILING.md](COMPILING.md), em inglês.*
+
 Você não precisa disto para **usar** a loja — o `.tar.gz` dos
 [Releases](../../releases) já vem com o DLL pronto. Isto é para quem quer ler,
 alterar ou conferir o que está rodando no servidor.

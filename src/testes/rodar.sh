@@ -1,24 +1,26 @@
 #!/bin/bash
-# Roda a bateria do ConanShop SOB WINE — o ambiente de verdade.
+# Runs the ConanShop suite UNDER WINE — the real environment.
 #
-# POR QUE SOB WINE, E NAO EM LINUX NATIVO
-# ----------------------------------------
-# O plugin roda dentro do servidor Windows do Conan, que nesta VPS roda sob
-# Wine. Testar a logica em Linux nativo provaria que ela funciona num lugar onde
-# ela nao vai rodar — e as diferencas que importam (o SQLite abrindo arquivo, o
-# escalonamento das threads na corrida) sao justamente as que mudam entre os
-# dois.
+# WHY UNDER WINE, AND NOT ON NATIVE LINUX
+# ---------------------------------------
+# The plugin runs inside Conan's Windows server, which on this VPS runs under
+# Wine. Testing the logic on native Linux would prove it works somewhere it
+# isn't going to run — and the differences that matter (SQLite opening a file,
+# how threads get scheduled in the race) are exactly the ones that change
+# between the two.
 #
-# O QUE CADA UM PROVA
-#   controle_positivo  que o teste_pontos SABE reprovar (ver abaixo)
-#   teste_pontos       a carteira: ninguem gasta o que nao tem, nem duas vezes
-#   teste_config       config quebrada NAO substitui a boa
-#   teste_texto        !shop nao engole !shopreload; o formato do dono nao e' printf
+# WHAT EACH ONE PROVES
+#   controle_positivo  that teste_pontos KNOWS HOW TO FAIL (see below)
+#   teste_pontos       the wallet: nobody spends what they don't have, or twice
+#   teste_config       a broken config does NOT replace a good one
+#   teste_texto        !shop doesn't swallow !shopreload; the owner's format
+#                      isn't printf
 #
-# O CONTROLE POSITIVO NAO E' ENFEITE. Na primeira versao, o teste_pontos passou
-# e o controle positivo REPROVOU: com o mutex do proprio teste em volta, ate' a
-# implementacao defeituosa passava. O instrumento estava cego e o "APROVADO" nao
-# media nada. Enquanto o controle positivo nao passar, ignore o resto.
+# THE POSITIVE CONTROL IS NOT DECORATION. In the first version teste_pontos
+# passed and the positive control FAILED: with the test's own mutex wrapped
+# around it, even the broken implementation passed. The instrument was blind and
+# the "PASSED" measured nothing. Until the positive control passes, ignore the
+# rest.
 set -e
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 PLUG="$AQUI/.."
@@ -59,12 +61,12 @@ x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -I "$PLUG" \
   -o "$OBJ/teste_texto.exe" "$AQUI/teste_texto.cpp" \
   -static-libgcc -static-libstdc++ -static
 
-# ── onde rodar ──────────────────────────────────────────────────────────────
+# ── where to run ────────────────────────────────────────────────────────────
 #
-# Aceita um wine local; se nao houver, tenta o do container do servidor, que e'
-# onde o Wine desta VPS mora. Sem nenhum dos dois, PARA com codigo 2 — em vez de
-# "pular os testes" e devolver sucesso, que e' a forma mais comum de bateria
-# mentir. Codigo 2 quer dizer NAO CONFERI, e isso nao e' aprovacao.
+# It takes a local wine; if there isn't one, it tries the server container's,
+# which is where this VPS's Wine lives. With neither, it STOPS with exit code 2
+# — rather than "skipping the tests" and returning success, which is the most
+# common way a suite lies. Code 2 means I DIDN'T CHECK, and that isn't a pass.
 RODAR=""
 if command -v wine >/dev/null 2>&1; then
     RODAR="local"
@@ -93,10 +95,10 @@ executar() {   # $1 = exe, $2... = argumentos
 FALHOU=0
 NAO_CONFERI=0
 set +e
-# Cada teste quer um argumento diferente, e passar o errado faz o teste
-# reprovar por motivo que nao e' o dele — aconteceu aqui: o teste_config
-# recebeu um nome de BANCO onde esperava uma PASTA, e acusou "nao consegui
-# abrir bom.json" como se o parser estivesse quebrado.
+# Each test wants a different argument, and passing the wrong one makes the test
+# fail for a reason that isn't its own — which happened here: teste_config got a
+# DATABASE name where it expected a FOLDER, and reported "nao consegui abrir
+# bom.json" as if the parser were broken.
 for t in controle_positivo teste_pontos teste_config teste_texto; do
     echo
     echo "══════════════ $t ══════════════"
@@ -106,29 +108,29 @@ for t in controle_positivo teste_pontos teste_config teste_texto; do
         *)            executar "$t.exe" "$t.db" ;;
     esac
     rc=$?
-    # ── REPROVOU x NAO CONSEGUI RODAR ───────────────────────────────────────
+    # ── FAILED vs COULDN'T RUN ──────────────────────────────────────────────
     #
-    # A versao anterior fazia `else FALHOU=1` — qualquer codigo diferente de
-    # zero virava REPROVADO. So' que os testes devolvem 1 quando reprovam, e
-    # tudo o mais vem de FORA deles:
+    # The previous version did `else FALHOU=1` — any non-zero code became
+    # FAILED. But the tests return 1 when they fail, and everything else comes
+    # from OUTSIDE them:
     #
-    #   124  o `timeout 300` estourou
-    #   125  o docker nao conseguiu executar
-    #   126  o binario nao e' executavel
-    #   127  nao achou o comando (wine sumiu?)
-    #   137  morto por sinal (OOM, kill)
+    #   124  the `timeout 300` expired
+    #   125  docker couldn't execute
+    #   126  the binary isn't executable
+    #   127  command not found (did wine disappear?)
+    #   137  killed by a signal (OOM, kill)
     #
-    # Isso importa porque estes testes rodam DENTRO do container do servidor de
-    # jogo, compartilhando o wineserver com o Conan. Com o servidor sob carga,
-    # o wine as vezes nao responde — e a bateria dizia "REPROVADA", mandando
-    # procurar um defeito que nao existe.
+    # That matters because these tests run INSIDE the game server's container,
+    # sharing the wineserver with Conan. With the server under load, wine
+    # sometimes doesn't answer — and the suite said "FAILED", sending you to
+    # look for a defect that doesn't exist.
     #
-    # Medido em 20/08/2026: 1 reprovacao em ~10 rodadas, sem nenhuma alteracao
-    # de codigo entre elas. Um teste que reprova as vezes e' pior que um que
-    # reprova sempre: ensina a ignorar a reprovacao.
+    # Measured on 2026-08-20: 1 failure in ~10 runs, with no code change between
+    # them. A test that fails sometimes is worse than one that fails always: it
+    # teaches you to ignore the failure.
     #
-    # Agora: 0 = passou · 1 = REPROVOU de verdade · resto = NAO CONFERI, que
-    # nao e' aprovacao nem reprovacao.
+    # Now: 0 = passed · 1 = REALLY failed · anything else = I DIDN'T CHECK,
+    # which is neither a pass nor a failure.
     case $rc in
         0) echo "   -> passou" ;;
         1) echo "   -> REPROVOU"; FALHOU=1 ;;
@@ -139,12 +141,12 @@ for t in controle_positivo teste_pontos teste_config teste_texto; do
 done
 set -e
 
-# ── nao deixar rastro na pasta do servidor ──────────────────────────────────
+# ── leave no trace in the server's folder ───────────────────────────────────
 #
-# Quando roda pelo container, a ponte e' `~/conan/logs`, que e' uma pasta REAL
-# do servidor montada la' dentro. Os .exe, os .db e os .json que o teste_config
-# escreve ficavam ali depois — 5 MB de lixo nosso numa pasta que o dono do
-# servidor abre para ver LOG. Some quem criou.
+# When it runs through the container, the bridge is `~/conan/logs`, which is a
+# REAL server folder mounted inside it. The .exe, .db and .json files
+# teste_config writes were being left behind — 5 MB of our rubbish in a folder
+# the server owner opens to read LOGS. Whoever made them cleans them up.
 if [ "$RODAR" = "container" ]; then
     ponte="/home/andrew/conan/logs"
     for t in controle_positivo teste_pontos teste_config teste_texto; do

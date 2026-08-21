@@ -45,8 +45,8 @@ namespace
             return ok != 0;
         }
 
-        // Texto de um caminho. `achou` distingue "campo ausente" de "campo
-        // vazio" — os dois viriam como "" e significam coisas diferentes.
+        // The text at a path. `achou` tells "field missing" apart from "field
+        // empty" — both would arrive as "" and they mean different things.
         std::string Texto(const std::string& t, const char* caminho, bool* achou = nullptr)
         {
             if (achou) *achou = false;
@@ -229,7 +229,7 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
         c.banco.caminhoLocal    = j.Texto(texto, "$.banco.caminho_local");
     }
 
-    // ── pontos ──────────────────────────────────────────────────────────────
+    // ── points ──────────────────────────────────────────────────────────────
     c.pontosLigados = j.Booleano(texto, "$.pontos.ligado", true);
     c.pontosMinutos = int(j.Inteiro(texto, "$.pontos.minutos", 5));
     c.pontosSomar   = j.Booleano(texto, "$.pontos.somar", false);
@@ -256,10 +256,10 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
             }, &ctx, e);
     }
 
-    // ── loja / comandos / permissoes ────────────────────────────────────────
+    // ── shop / commands / permissions ───────────────────────────────────────
     c.itensPorPagina = int(j.Inteiro(texto, "$.loja.itens_por_pagina", 12));
     if (c.itensPorPagina < 1)  c.itensPorPagina = 1;
-    if (c.itensPorPagina > 40) c.itensPorPagina = 40;   // acima disso a tela corta
+    if (c.itensPorPagina > 40) c.itensPorPagina = 40;   // above this the screen cuts off
     c.usarTela     = j.Booleano(texto, "$.loja.usar_tela", true);
     c.tituloDaTela = j.Texto(texto, "$.loja.titulo_da_tela");
     if (c.tituloDaTela.empty()) c.tituloDaTela = "Loja";
@@ -353,7 +353,7 @@ bool LerConfig(const char* caminho, Config& destino, std::string& erro)
                 if (it.nome.empty())      it.nome = it.chave;
                 if (it.categoria.empty()) it.categoria = "outros";
 
-                // Chave repetida: o segundo nunca seria comprado.
+                // A repeated key: the second one could never be bought.
                 for (const Item& j2 : x->cfg->itens)
                     if (j2.chave == it.chave) { ++x->recusados; return; }
 

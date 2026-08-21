@@ -1,5 +1,7 @@
 # Roteiro do teste com jogador real
 
+*Tradução. O documento principal é o [TESTING-WITH-A-PLAYER.md](TESTING-WITH-A-PLAYER.md), em inglês.*
+
 Três coisas do ConanShop **não podem ser provadas sem alguém dentro do jogo**.
 Elas estão escritas contra a assinatura que a reflexão desta build declara, e o
 caminho *chat → jogador* já está provado no ar pelo ExemploJogador — mas neste

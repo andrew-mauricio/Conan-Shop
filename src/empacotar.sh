@@ -1,38 +1,39 @@
 #!/bin/bash
-# Monta o pacote do ConanShop para distribuir — a pasta que o dono do servidor
-# arrasta para dentro de Conan-Api/Plugins/ e pronto.
+# Builds the ConanShop package for distribution — the folder a server owner
+# drags into Conan-Api/Plugins/ and is done.
 #
-# POR QUE UM PACOTE SEPARADO, E NAO DENTRO DO PACOTE DA API
-# ---------------------------------------------------------
-# O `Plugins/` da distribuicao da Conan-Api leva UM plugin de proposito: o
-# Permission, que e' servico dos outros. A razao esta escrita no
-# montar-distribuicao.sh — se a pasta ja' vier com oito coisas nossas dentro, o
-# dono nao sabe o que e' dele, nao sabe o que pode apagar, e sobe no servidor
-# coisa que ninguem pediu.
+# WHY A SEPARATE PACKAGE, AND NOT INSIDE THE API'S
+# ------------------------------------------------
+# Conan-Api's distribution ships ONE plugin in `Plugins/` on purpose:
+# Permission, which is a service to the others. The reasoning is written down in
+# montar-distribuicao.sh — if the folder arrives with eight things of ours
+# inside, the owner doesn't know what's theirs, doesn't know what they can
+# delete, and brings up things on their server nobody asked for.
 #
-# O ConanShop e' um plugin de VERDADE, nao um exemplo: quem baixa quer a loja
-# funcionando, nao o fonte para estudar. Entao ele tem pacote proprio, e o dono
-# escolhe instalar.
+# ConanShop is a REAL plugin, not an example: whoever downloads it wants the
+# shop working, not the source to study. So it gets its own package, and the
+# owner chooses to install it.
 #
-# O QUE VAI DENTRO
-#   ConanShop.dll        o plugin
-#   config.json          o que o dono edita (120 itens ja' preenchidos)
-#   PluginInfo.json      a identidade, que o carregador le'
-#   LEIA-ME.md           como instalar e como usar
-#   TESTE-COM-JOGADOR.md o roteiro do que so' se prova jogando
+# WHAT GOES INSIDE
+#   ConanShop.dll             the plugin
+#   config.json               what the owner edits (120 items already filled in)
+#   PluginInfo.json           the identity the loader reads
+#   README.md                 how to install and how to use it
+#   TESTING-WITH-A-PLAYER.md  the script for what can only be proved by playing
 #
-# O conanshop.db NAO vai: ele nasce sozinho na primeira execucao. Mandar um
-# banco pronto levaria junto os pontos dos jogadores DESTE servidor.
+# conanshop.db does NOT go: it's born on its own on the first run. Shipping a
+# ready-made database would carry THIS server's players' points along with it.
 set -e
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 SAIDA="${1:-$AQUI/pacote}"
 NOME="ConanShop"
 
-# ── o DLL tem de ser desta compilacao ───────────────────────────────────────
+# ── the DLL has to come from THIS build ─────────────────────────────────────
 #
-# Empacotar um DLL velho e' o erro que este projeto ja' cometeu duas vezes: o
-# link falha, o arquivo anterior continua no lugar, e o pacote sai com o binario
-# de ontem. Comparar o md5 antes e depois e' o unico jeito de saber.
+# Packaging a stale DLL is a mistake this project has already made twice: the
+# link fails, the previous file stays where it was, and the package ships
+# yesterday's binary. Comparing the md5 before and after is the only way to
+# know.
 echo "== compilando =="
 antes=""
 [ -f "$AQUI/$NOME.dll" ] && antes=$(md5sum "$AQUI/$NOME.dll" | cut -d' ' -f1)
@@ -44,10 +45,10 @@ else
     echo "  DLL novo: $depois"
 fi
 
-# ── os testes PRECISAM passar antes de empacotar ────────────────────────────
+# ── the tests MUST pass before packaging ────────────────────────────────────
 #
-# Um pacote com a bateria reprovada e' um pacote que nao deveria existir. E o
-# codigo 2 (nao consegui rodar) tambem NAO e' aprovacao — e' o contrario dela.
+# A package built on a failed suite is a package that shouldn't exist. And exit
+# code 2 (couldn't run them) is NOT a pass either — it's the opposite of one.
 echo
 echo "== bateria de testes =="
 set +e
@@ -64,11 +65,12 @@ case $rc in
      exit 1 ;;
 esac
 
-# ── o config tem de ser JSON valido ─────────────────────────────────────────
+# ── the config has to be valid JSON ─────────────────────────────────────────
 #
-# Ele e' o unico arquivo do pacote que uma pessoa edita, e sai daqui ja' com 120
-# itens. Mandar um config quebrado faria o plugin recusar-se a subir na maquina
-# de quem baixou — com uma mensagem correta e uma primeira impressao pessima.
+# It's the only file in the package a person edits, and it leaves here with 120
+# items already in it. Shipping a broken config would make the plugin refuse to
+# come up on the downloader's machine — with a correct message and a terrible
+# first impression.
 echo
 echo "== conferindo o config.json =="
 python3 - "$AQUI/config.json" <<'PYEOF'
@@ -87,27 +89,30 @@ if ruins:
 print(f"  ✅ {len(itens)} itens, todos com template_id")
 PYEOF
 
-# ── montar ──────────────────────────────────────────────────────────────────
+# ── assemble ────────────────────────────────────────────────────────────────
 rm -rf "$SAIDA"
 mkdir -p "$SAIDA/$NOME"
 
 cp "$AQUI/$NOME.dll"      "$SAIDA/$NOME/"
 cp "$AQUI/config.json"    "$SAIDA/$NOME/"
 cp "$AQUI/PluginInfo.json" "$SAIDA/$NOME/"
-cp "$AQUI/README-CONANSHOP.md"   "$SAIDA/$NOME/LEIA-ME.md"
-cp "$AQUI/TESTE-COM-JOGADOR.md"  "$SAIDA/$NOME/" 2>/dev/null || true
+cp "$AQUI/README-CONANSHOP.md"      "$SAIDA/$NOME/README.md"
+cp "$AQUI/README-CONANSHOP.pt.md"   "$SAIDA/$NOME/LEIA-ME.pt.md"
+cp "$AQUI/TESTING-WITH-A-PLAYER.md" "$SAIDA/$NOME/" 2>/dev/null || true
+cp "$AQUI/TESTE-COM-JOGADOR.pt.md"  "$SAIDA/$NOME/" 2>/dev/null || true
 
-# ── a conferencia final: o pacote tem o que o carregador procura? ───────────
+# ── the final check: does the package hold what the loader looks for? ───────
 #
-# O carregador varre `Plugins/<pasta>/*.dll` e le' `PluginInfo.json`. Sem um dos
-# dois ele registra o motivo e pula — mas quem baixou ve' "nao funciona".
+# The loader sweeps `Plugins/<folder>/*.dll` and reads `PluginInfo.json`.
+# Missing either one, it logs the reason and skips — but the person who
+# downloaded it just sees "it doesn't work".
 falta=0
 for f in "$NOME.dll" "PluginInfo.json" "config.json"; do
     [ -f "$SAIDA/$NOME/$f" ] || { echo "  x FALTA $f no pacote"; falta=1; }
 done
 [ "$falta" = "1" ] && exit 1
 
-# O PluginInfo tem de ser legivel: o carregador RECUSA o plugin se nao for.
+# PluginInfo has to be readable: the loader REFUSES the plugin if it isn't.
 python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" \
     "$SAIDA/$NOME/PluginInfo.json" || { echo "  x PluginInfo.json invalido"; exit 1; }
 

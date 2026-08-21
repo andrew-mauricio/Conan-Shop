@@ -1,14 +1,14 @@
-// teste_texto — o roteamento de comando e a montagem de mensagem.
+// teste_texto — command routing and message assembly.
 //
-// O CASO QUE ESTE TESTE EXISTE PARA PEGAR
-// ----------------------------------------
-// `!shop` engolindo `!shopreload`. Se `Prefixo` fosse um "começa com", o
-// comando mais curto atenderia todos os outros — e o sintoma seria o dono
-// digitando !shopreload, vendo a LISTA DA LOJA aparecer, e concluindo que o
-// config não recarrega. Nenhum erro em lugar nenhum.
+// THE CASE THIS TEST EXISTS TO CATCH
+// ----------------------------------
+// `!shop` swallowing `!shopreload`. If `Prefixo` were a "starts with", the
+// shortest command would answer all the others — and the symptom would be the
+// owner typing !shopreload, watching the SHOP LIST appear, and concluding the
+// config doesn't reload. No error anywhere at all.
 //
-// A ordem em que o plugin testa os comandos também importa, e o caso 3 refaz
-// essa ordem exatamente como o roteador faz.
+// The order in which the plugin tests the commands matters too, and case 3
+// reproduces that order exactly as the router does it.
 #include "../Texto.h"
 
 #include <cstdio>
@@ -108,8 +108,8 @@ int main()
              "sem valores, o placeholder some");
 
     std::printf("\n== 5. o que NAO pode acontecer: formato do dono nao vira printf ==\n");
-    // Se isto passasse por printf, um "%s" digitado no config.json leria
-    // memoria arbitraria do servidor. Aqui e' texto comum.
+    // If this went through printf, a "%s" typed into config.json would read
+    // arbitrary server memory. Here it's ordinary text.
     const std::string perigoso = "saldo %s %d %n {0}";
     const std::string saiu = Shop::Formatar(perigoso, {"7"});
     Conferir(saiu == "saldo %s %d %n 7",

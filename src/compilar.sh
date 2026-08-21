@@ -1,31 +1,31 @@
 #!/bin/bash
-# Compila o ConanShop. Nada alem do compilador cruzado do MinGW e' necessario —
-# quem for da comunidade nao precisa de Visual Studio nem do editor da Unreal.
+# Builds ConanShop. Nothing beyond the MinGW cross-compiler is needed — nobody
+# from the community needs Visual Studio or the Unreal editor.
 #
-# O QUE ENTRA NO DLL, E POR QUE
-#   ConanShop.cpp  Config.cpp  Pontos.cpp  Comandos.cpp   o plugin
-#   MySqlCliente.cpp                        o cliente MySQL desta casa
-#   sqlite3.o                               o banco local E o leitor de JSON
+# WHAT GOES INTO THE DLL, AND WHY
+#   ConanShop.cpp  Config.cpp  Pontos.cpp  Comandos.cpp   the plugin
+#   MySqlCliente.cpp                        our own MySQL client
+#   sqlite3.o                               the local DB AND the JSON reader
 #
-# O SQLITE ENTRA DUAS VEZES DE PROPOSITO: ele e' o banco local (conanshop.db) e
-# tambem o parser do config.json (json_valid/json_extract/json_each). Escrever
-# um parser de JSON a mao para ler arquivo que o dono edita a mao seria codigo
-# novo no caminho mais exposto do plugin — e o SQLite ja' esta aqui.
+# SQLITE IS IN HERE TWICE ON PURPOSE: it's the local database (conanshop.db) and
+# also the config.json parser (json_valid/json_extract/json_each). Hand-writing
+# a JSON parser to read a file the owner edits by hand would be new code on the
+# plugin's most exposed path — and SQLite is already here.
 #
-# O MySQL entra SEMPRE, mesmo em quem so' vai usar o banco local: um .dll que
-# so' linka o MySQL "quando precisa" seriam dois arquivos com o mesmo nome, e o
-# suporte a um servidor de terceiro comecaria por descobrir qual dos dois o dono
-# baixou.
+# MySQL goes in ALWAYS, even for people who'll only use the local database: a
+# .dll that links MySQL "when it needs to" would be two files with the same
+# name, and supporting somebody else's server would start with figuring out
+# which of the two the owner downloaded.
 set -e
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 OBJ="$AQUI/build"
 mkdir -p "$OBJ"
 
-# ── onde estao os headers ───────────────────────────────────────────────────
+# ── where the headers are ───────────────────────────────────────────────────
 #
-# Procurados, nunca assumidos: este mesmo script roda na arvore de
-# desenvolvimento (plugins/ConanShop/) e no SDK que a comunidade baixa
-# (Exemplos/ConanShop/), que tem formatos diferentes.
+# Searched for, never assumed: this same script runs in the development tree
+# (plugins/ConanShop/) and in the SDK the community downloads
+# (Exemplos/ConanShop/), which have different shapes.
 INC=""
 if [ -n "${CONAN_SDK_INCLUDE:-}" ] && [ -f "$CONAN_SDK_INCLUDE/Conan/ConanPluginApi.h" ]; then
     INC="$CONAN_SDK_INCLUDE"
@@ -45,7 +45,7 @@ if [ -z "$INC" ]; then
     exit 1
 fi
 
-# O header do Permission mora em lugar diferente na arvore e no SDK.
+# Permission's header lives in a different place in the tree and in the SDK.
 PERM=""
 if [ ! -f "$INC/Conan/ConanPermission.h" ]; then
     for c in "$AQUI/../Permission/include" "$AQUI/../../plugins/Permission/include" \
@@ -59,7 +59,7 @@ if [ -z "$PERM" ] && [ ! -f "$INC/Conan/ConanPermission.h" ]; then
     exit 1
 fi
 
-# O que e' generico mora em plugins/comum e NAO e' copiado para ca.
+# Anything generic lives in plugins/comum and is NOT copied here.
 COMUM=""
 for c in "$AQUI/../comum" "$AQUI/../../plugins/comum" "$AQUI/comum"; do
     [ -f "$c/MySqlCliente.h" ] && { COMUM="$c"; break; }
@@ -88,15 +88,17 @@ if [ ! -f "$OBJ/sqlite3.o" ]; then
 fi
 
 echo "== ConanShop.dll =="
-# -Wl,--no-insert-timestamp: build REPRODUZIVEL. O MinGW carimba a hora da
-# compilacao no cabecalho PE, entao duas compilacoes do MESMO fonte saiam com
-# md5 diferente. Isso impedia provar que o binario publicado veio do fonte
-# publicado — a unica pergunta que importa para quem baixa um DLL que vai rodar
-# dentro do servidor dele. Sem a flag, "confira o hash" nao significava nada.
+# -Wl,--no-insert-timestamp: REPRODUCIBLE build. MinGW stamps the build time
+# into the PE header, so two builds of the SAME source came out with different
+# md5s. That made it impossible to prove the published binary came from the
+# published source — the only question that matters to someone downloading a DLL
+# that will run inside their server. Without the flag, "check the hash" meant
+# nothing.
 #
-# -Wl,--exclude-all-symbols: o DLL exporta SO' o que tem __declspec(dllexport).
-# Sem isso o MinGW auto-exporta as ~250 funcoes sqlite3_* que estao estaticamente
-# dentro dele, e outro plugin que fizesse GetProcAddress pegaria o NOSSO handle.
+# -Wl,--exclude-all-symbols: the DLL exports ONLY what is marked
+# __declspec(dllexport). Without it MinGW auto-exports the ~250 sqlite3_*
+# functions that sit statically inside it, and another plugin doing
+# GetProcAddress would grab OUR handle.
 x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -shared \
     -I "$INC" $PERM -I "$AQUI" -I "$COMUM" \
     -o "$OBJ/ConanShop.dll" \
@@ -108,11 +110,11 @@ x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -shared \
 
 cp "$OBJ/ConanShop.dll" "$AQUI/ConanShop.dll"
 
-# ── a guarda de exportacao, com controle positivo ───────────────────────────
+# ── the export guard, with a positive control ───────────────────────────────
 #
-# Contar zero so' prova alguma coisa se o instrumento souber contar. A isca
-# EXPORTA de proposito o que a guarda procura; se ela nao enxergar a isca, a
-# guarda esta cega e o "zero" do DLL de verdade nao vale nada.
+# Counting zero only proves something if the instrument can count. The decoy
+# EXPORTS on purpose what the guard looks for; if the guard can't see the decoy,
+# it's blind and the real DLL's "zero" is worth nothing.
 echo
 echo "== a guarda de exportacao sabe enxergar? (controle positivo) =="
 ISCA="$OBJ/isca_da_guarda"

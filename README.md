@@ -18,7 +18,7 @@ adapted to how Conan Exiles actually identifies items.*
 **[English](README.md)** ·
 [Português](Docs/README.pt.md) ·
 [Manual](Docs/MANUAL.md) ·
-[Build from source](src/COMPILAR.md) ·
+[Build from source](src/COMPILING.md) ·
 [Download](../../releases)
 
 </div>
@@ -264,7 +264,7 @@ Practical consequences for you as the operator:
 - A bug in any native plugin, including this one, can crash the server.
 - Install what you trust. This plugin's full source is in
   [`src/`](src/), including its tests, and the published binary is
-  reproducible, see [Build from source](src/COMPILAR.md).
+  reproducible, see [Build from source](src/COMPILING.md).
 
 ---
 

@@ -1,17 +1,19 @@
-// teste_config — o config.json e' o caminho MAIS EXPOSTO do plugin.
+// teste_config — config.json is the plugin's MOST EXPOSED path.
 //
-// POR QUE ESTE TESTE EXISTE
-// -------------------------
-// Todo o resto do plugin roda a partir do que este arquivo leu. E ele e'
-// editado a mao, de madrugada, por alguem com o servidor cheio — que e'
-// exatamente quando se erra uma virgula.
+// WHY THIS TEST EXISTS
+// --------------------
+// Everything else in the plugin runs from what this file read. And it gets
+// edited by hand, late at night, by somebody with a full server — which is
+// exactly when a comma goes missing.
 //
-// A promessa do plugin e' "config quebrada NAO substitui a boa". Promessa nao
-// testada e' promessa. Aqui ela e' exercitada com arquivos ruins de verdade.
+// The plugin's promise is "a broken config does NOT replace a good one". An
+// untested promise is just a promise. Here it gets exercised with genuinely bad
+// files.
 //
-// O caso mais importante e' o 3: JSON valido, itens INVALIDOS. Ele e' o unico
-// em que um plugin descuidado sobe "com sucesso" e fica cobrando pontos sem
-// entregar nada — porque zero itens e' um estado sintaticamente valido.
+// The most important case is number 3: valid JSON, INVALID items. It's the only
+// one where a careless plugin comes up "successfully" and goes on charging
+// points without delivering anything — because zero items is a syntactically
+// valid state.
 #include "../Config.h"
 
 #include <cstdio>
@@ -64,7 +66,8 @@ int main(int argc, char** argv)
         Conferir(c.itensPorPagina == 5,"itens por pagina = 5");
         Conferir(!c.usarTela,          "usar_tela = false");
         Conferir(c.cmdLoja == "!loja", "comando trocado", c.cmdLoja);
-        // O que NAO foi escrito no arquivo tem de cair no padrao, nao em vazio.
+        // What was NOT written in the file has to fall back to the default,
+        // not to empty.
         Conferir(c.cmdPontos == "!pontos", "comando ausente virou o padrao", c.cmdPontos);
         Conferir(c.pontosPorGrupo.size() == 2, "dois grupos de pontos");
         const Shop::Item* p = c.Achar("pedra");
@@ -86,8 +89,9 @@ int main(int argc, char** argv)
              std::to_string(c.itens.size()) + " item(ns)");
 
     std::printf("\n== 3. JSON VALIDO, itens invalidos (o caso perigoso) ==\n");
-    // Sintaticamente perfeito. Se o plugin aceitasse, subiria com zero itens e
-    // uma loja que cobra e nao entrega — sem nenhum erro em lugar nenhum.
+    // Syntactically perfect. If the plugin accepted it, it would come up with
+    // zero items and a shop that charges and delivers nothing — with no error
+    // anywhere at all.
     const char* SEM_ID = R"({
       "itens": {
         "fantasma": { "nome": "Sem id",   "preco": 10 },
@@ -124,8 +128,8 @@ int main(int argc, char** argv)
     Conferir(!erro.empty(), "e disse qual", erro);
 
     std::printf("\n== 7. item ruim no meio de bons: sobra o que presta ==\n");
-    // Um id errado no item 3 nao pode tirar a loja do ar — mas o dono TEM de
-    // saber que o que ele escreveu nao entrou inteiro.
+    // A wrong id on item 3 must not take the shop down — but the owner HAS to
+    // know that what they wrote didn't go in whole.
     const char* MISTO = R"({
       "itens": {
         "bom1": { "nome":"A", "template_id": 10001, "preco": 5 },

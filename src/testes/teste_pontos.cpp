@@ -1,21 +1,21 @@
-// teste_pontos — prova que a carteira nao deixa gastar o que nao existe,
-// nem gastar duas vezes o mesmo ponto.
+// teste_pontos — proves the wallet won't let you spend what isn't there, or
+// spend the same point twice.
 //
-// POR QUE ESTE TESTE EXISTE
-// -------------------------
-// A regra "nao pode ficar negativo" e' facil de escrever e facil de acreditar
-// que esta valendo. O ArkShop, que serviu de referencia, acredita nela: a
-// checagem esta em C++, antes do UPDATE, e o UPDATE nao a repete. Sob duas
-// compras simultaneas isso vaza — e o vazamento nao aparece em uso normal, so'
-// no clique duplo e no jogador com dois clientes.
+// WHY THIS TEST EXISTS
+// --------------------
+// The rule "it can't go negative" is easy to write and easy to believe is
+// holding. ArkShop, which served as the reference, believes it: the check is in
+// C++, before the UPDATE, and the UPDATE doesn't repeat it. Under two
+// simultaneous purchases that leaks — and the leak doesn't show up in ordinary
+// use, only on a double click and on a player with two clients.
 //
-// Um teste que apenas credita e debita em sequencia NAO acharia esse defeito:
-// passaria igual nas duas implementacoes. Por isso o caso 4 usa threads de
-// verdade, disputando a mesma carteira.
+// A test that only credits and debits in sequence would NOT find that defect:
+// it would pass on both implementations alike. That's why case 4 uses real
+// threads, fighting over the same wallet.
 //
-// RODA SOB WINE porque e' o ambiente de verdade: o plugin roda no servidor
-// Windows do Conan, sob Wine nesta VPS. Testar em Linux nativo provaria a
-// logica num lugar onde ela nao vai rodar.
+// IT RUNS UNDER WINE because that's the real environment: the plugin runs in
+// Conan's Windows server, under Wine on this VPS. Testing on native Linux would
+// prove the logic somewhere it isn't going to run.
 #include "../Pontos.h"
 
 #include <cstdio>
@@ -39,8 +39,9 @@ static void LogDoBanco(const char* linha) { std::printf("      (banco) %s\n", li
 int main(int argc, char** argv)
 {
     const std::string caminho = (argc > 1) ? argv[1] : "teste_pontos.db";
-    // Comeca limpo. O -wal e o -shm tambem: sem apagar os tres, o dado do teste
-    // anterior RESSUSCITA e o teste passa medindo a corrida passada.
+    // Start clean. The -wal and the -shm too: without deleting all three, the
+    // previous test's data COMES BACK and the test passes while measuring the
+    // previous race.
     std::remove(caminho.c_str());
     std::remove((caminho + "-wal").c_str());
     std::remove((caminho + "-shm").c_str());

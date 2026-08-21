@@ -10,8 +10,8 @@ os mesmos comandos, adaptada ao Conan.*
 
 <img src="../.github/imagens/loja.png" width="440">
 
-**[Manual completo](Docs/MANUAL.md)** · **[Compilar do fonte](src/COMPILAR.md)** ·
-**[Roteiro de teste](Docs/TESTE-COM-JOGADOR.md)** · **[Baixar](../../releases)**
+**[Manual completo](MANUAL.pt.md)** · **[Compilar do fonte](../src/COMPILAR.pt.md)** ·
+**[Roteiro de teste](TESTE-COM-JOGADOR.pt.md)** · **[Baixar](../../releases)**
 
 </div>
 
@@ -247,9 +247,9 @@ A bateria roda com `testes/rodar.sh`, sob Wine — o ambiente de verdade.
 
 | | |
 |---|---|
-| **[Manual completo](Docs/MANUAL.md)** | cada chave do `config.json`, o que o plugin protege e o que ele **não** resolve |
-| **[Compilar do fonte](src/COMPILAR.md)** | só o mingw-w64; e como conferir que o DLL publicado veio deste código |
-| **[Roteiro de teste](Docs/TESTE-COM-JOGADOR.md)** | o que testar dentro do jogo, em ordem, e o que cada falha significa |
+| **[Manual completo](MANUAL.pt.md)** | cada chave do `config.json`, o que o plugin protege e o que ele **não** resolve |
+| **[Compilar do fonte](../src/COMPILAR.pt.md)** | só o mingw-w64; e como conferir que o DLL publicado veio deste código |
+| **[Roteiro de teste](TESTE-COM-JOGADOR.pt.md)** | o que testar dentro do jogo, em ordem, e o que cada falha significa |
 | **[Conan-Api](https://github.com/andrew-mauricio/Conan-Api)** | a API que este plugin usa — instale-a primeiro |
 | **[Conan-Api-SDK](https://github.com/andrew-mauricio/Conan-Api-SDK)** | para escrever o seu próprio plugin |
 

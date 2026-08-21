@@ -182,10 +182,10 @@ static void Falar(const Jogador& j, const std::string& texto)
             ConanApi::Call<void>(j.controller, "ClientHUDShowNotification",
                                  ConanApi::TextoRico(texto.c_str()),
                                  bool(true),    // positive
-                                 bool(false));  // bPlaySound: sem som, e' resposta de comando
+                                 bool(false));  // bPlaySound: no sound, it's a command reply
             return g_api->UltimaChamadaExecutou() != 0;
         case 2:
-            // Mensagem de sistema do PlayerController da Unreal.
+            // Unreal's PlayerController system message.
             ConanApi::Call<void>(j.controller, "ClientMessage",
                                  ConanApi::Texto(texto.c_str()),
                                  ConanApi::Nome("Event"),
@@ -204,7 +204,7 @@ static void Falar(const Jogador& j, const std::string& texto)
 
     for (int i = 1; i <= 3; ++i)
     {
-        if (i == caminho) continue;          // ja' tentei acima
+        if (i == caminho) continue;          // already tried it above
         if (!tentar(i)) continue;
         if (caminho != i)
         {

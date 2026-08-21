@@ -1,24 +1,26 @@
-// controle_positivo — prova que o teste_pontos SABE reprovar.
+// controle_positivo — proves that teste_pontos KNOWS HOW TO FAIL.
 //
-// POR QUE ISTO EXISTE
-// -------------------
-// O teste_pontos passou. Sozinho, isso nao prova que o debito e' atomico —
-// prova que o teste nao achou problema, que e' outra coisa. Um teste com a
-// condicao de corrida mal montada (poucas threads, disputa fraca, banco
-// serializando por acaso) passa igual nas duas implementacoes e da' uma
-// aprovacao que nao significa nada.
+// WHY THIS EXISTS
+// ---------------
+// teste_pontos passed. On its own that doesn't prove the debit is atomic — it
+// proves the test found no problem, which is a different thing. A test with a
+// badly built race (too few threads, weak contention, a database serialising by
+// luck) passes on both implementations alike and hands you a pass that means
+// nothing.
 //
-// Este programa refaz a MESMA corrida contra a implementacao INGENUA — a do
-// ArkShop, com a checagem de saldo fora do UPDATE:
+// This program re-runs the SAME race against the NAIVE implementation —
+// ArkShop's, with the balance check outside the UPDATE:
 //
-//     if (saldo >= preco)                        <- le
-//         UPDATE carteira SET pontos = pontos-?  <- gasta, sem repetir a condicao
+//     if (balance >= price)                      <- read
+//         UPDATE carteira SET pontos = pontos-?  <- spend, without repeating
+//                                                   the condition
 //
-// Se o teste for capaz de achar o defeito, aqui ele TEM de falhar: mais de 20
-// compras passam, ou o saldo termina negativo. Se passar nas duas, o teste esta
-// cego e a aprovacao do outro nao vale.
+// If the test is capable of finding the defect, then here it MUST fail: more
+// than 20 purchases go through, or the balance ends up negative. If it passes
+// on both, the test is blind and the other one's pass is worth nothing.
 //
-// Este arquivo NAO entra no plugin. E' instrumento de aferição do instrumento.
+// This file does NOT go into the plugin. It's the instrument that calibrates
+// the instrument.
 #include "terceiros/sqlite3/sqlite3.h"
 
 #include <cstdio>
@@ -32,27 +34,29 @@
 namespace
 {
     sqlite3*    g_db = nullptr;
-    // O caminho do banco, para cada thread abrir a PROPRIA conexao.
+    // The database's path, so each thread opens its OWN connection.
     std::string g_caminho;
     std::mutex g_trava;
 
-    // Exatamente o padrao do ArkShop: le o saldo, decide em C++, e so' entao
-    // manda o UPDATE — que NAO repete a condicao.
-    // ── POR QUE NAO HA TRAVA AQUI ───────────────────────────────────────────
+    // Exactly ArkShop's pattern: read the balance, decide in C++, and only
+    // then send the UPDATE — which does NOT repeat the condition.
     //
-    // A primeira versao deste arquivo punha um std::mutex em volta de cada
-    // acesso, imitando a trava do Pontos.cpp. Com ela, a versao INGENUA passou
-    // no teste — 20 de 20, saldo zero — e o controle positivo REPROVOU,
-    // acusando o teste de cego.
+    // ── WHY THERE'S NO LOCK HERE ────────────────────────────────────────────
     //
-    // O diagnostico estava certo, e a causa era o proprio instrumento: uma
-    // trava que serializa ler-e-gastar apaga justamente a fresta que se quer
-    // medir. Testar com ela e' testar se o mutex funciona, nao se o SQL protege.
+    // The first version of this file wrapped every access in a std::mutex,
+    // imitating Pontos.cpp's lock. With it, the NAIVE version PASSED the test —
+    // 20 out of 20, balance zero — and the positive control FAILED, accusing
+    // the test of being blind.
     //
-    // Sem trava, cada thread e' um CLIENTE independente do banco — que e'
-    // exatamente o caso real que importa: dois servidores de jogo apontando
-    // para o MESMO MySQL, cada um com seu processo, sem mutex nenhum entre
-    // eles. E' para esse caso que a condicao mora dentro do UPDATE.
+    // The diagnosis was right, and the cause was the instrument itself: a lock
+    // that serialises read-then-spend erases exactly the gap we're trying to
+    // measure. Testing with it tests whether the mutex works, not whether the
+    // SQL protects anything.
+    //
+    // Without a lock, each thread is an INDEPENDENT client of the database —
+    // which is exactly the real case that matters: two game servers pointed at
+    // the SAME MySQL, each with its own process, with no mutex between them.
+    // That's the case the condition lives inside the UPDATE for.
     bool DebitarIngenuo(sqlite3* db, const char* jogador, int64_t quanto)
     {
         int64_t saldo = 0;
@@ -67,11 +71,11 @@ namespace
 
         if (saldo < quanto) return false;      // <- a checagem, FORA do UPDATE
 
-        // A pausa nao e' truque para forcar o defeito: representa o que
-        // qualquer loja faz entre decidir e cobrar — montar a mensagem,
-        // consultar permissao, achar o personagem. No ArkShop esse trecho
-        // chama GetPoints, formata FString e consulta o Permissions. Aqui e'
-        // um instante, e ja' basta.
+        // The pause isn't a trick to force the defect: it stands for what any
+        // shop does between deciding and charging — building the message,
+        // checking a permission, finding the character. In ArkShop that stretch
+        // calls GetPoints, formats an FString and queries Permissions. Here
+        // it's an instant, and that's already enough.
         std::this_thread::sleep_for(std::chrono::microseconds(50));
 
         {
@@ -82,8 +86,9 @@ namespace
             sqlite3_bind_int64(st, 1, quanto);
             sqlite3_bind_text (st, 2, jogador, -1, SQLITE_TRANSIENT);
             int rc;
-            // SQLITE_BUSY nao e' recusa de saldo: e' o banco ocupado. Repetir e'
-            // o que qualquer cliente faz, e e' o que mantem a comparacao justa.
+            // SQLITE_BUSY isn't a refusal for lack of balance: it's the
+            // database being busy. Retrying is what any client does, and it's
+            // what keeps the comparison fair.
             for (int tent = 0; (rc = sqlite3_step(st)) == SQLITE_BUSY && tent < 100; ++tent)
                 sqlite3_reset(st);
             sqlite3_finalize(st);
@@ -91,14 +96,15 @@ namespace
         }
     }
 
-    // A NOSSA: a mesma corrida, a mesma pausa, o mesmo tudo — muda so' o SQL.
-    // A condicao de saldo vai DENTRO do UPDATE, e quem decide e' o banco, uma
-    // vez, sob a trava dele. Nao ha o que ler antes, entao nao ha fresta entre
-    // ler e gastar.
+    // OURS: the same race, the same pause, everything the same — only the SQL
+    // changes. The balance condition goes INSIDE the UPDATE, and the database
+    // decides, once, under its own lock. There's nothing to read first, so
+    // there's no gap between reading and spending.
     bool DebitarComCondicao(sqlite3* db, const char* jogador, int64_t quanto)
     {
-        // A mesma pausa da versao ingenua, no mesmo lugar da linha do tempo:
-        // sem ela a comparacao seria entre uma corrida apertada e uma frouxa.
+        // The same pause as the naive version, at the same point in the
+        // timeline: without it the comparison would be between a tight race
+        // and a loose one.
         std::this_thread::sleep_for(std::chrono::microseconds(50));
 
         sqlite3_stmt* st = nullptr;
@@ -114,7 +120,8 @@ namespace
         sqlite3_finalize(st);
         if (rc != SQLITE_DONE) return false;
 
-        // "Alterou uma linha" e' a resposta do banco a pergunta "havia saldo?".
+        // "It changed a row" is the database's answer to "was there a
+        // balance?".
         return sqlite3_changes(db) == 1;
     }
 }
@@ -132,7 +139,7 @@ int main(int argc, char** argv)
     { std::printf("  X nao abriu o banco\n"); return 2; }
     sqlite3_busy_timeout(g_db, 5000);
     sqlite3_exec(g_db, "PRAGMA journal_mode=WAL;", nullptr, nullptr, nullptr);
-    // Sem o CHECK de propósito: aqui se quer VER o saldo negativo aparecer.
+    // No CHECK on purpose: here we WANT to see the negative balance show up.
     sqlite3_exec(g_db, "CREATE TABLE carteira (jogador TEXT PRIMARY KEY, pontos INTEGER NOT NULL DEFAULT 0);",
                  nullptr, nullptr, nullptr);
     sqlite3_exec(g_db, "INSERT INTO carteira (jogador,pontos) VALUES ('corrida',200);",
@@ -151,30 +158,32 @@ int main(int argc, char** argv)
         for (int t = 0; t < 8; ++t)
             ths.emplace_back([&, ingenuo]
             {
-                // ── UMA CONEXAO POR THREAD ──────────────────────────────────
+                // ── ONE CONNECTION PER THREAD ───────────────────────────────
                 //
-                // O comentario no topo desta funcao sempre disse "cada thread e'
-                // um CLIENTE independente do banco". O codigo nao fazia isso:
-                // as oito compartilhavam `g_db`.
+                // The comment at the top of this function always said "each
+                // thread is an INDEPENDENT client of the database". The code
+                // wasn't doing that: all eight shared `g_db`.
                 //
-                // Isso importa por causa de UMA linha, `sqlite3_changes(db)`,
-                // que responde "quantas linhas a ULTIMA operacao DESTA CONEXAO
-                // mudou". Com a conexao compartilhada, a thread A podia ler o
-                // `changes` que a thread B acabou de produzir — e contar como
-                // sucesso um UPDATE que nao foi dela.
+                // That matters because of ONE line, `sqlite3_changes(db)`,
+                // which answers "how many rows did THIS CONNECTION's LAST
+                // operation change". With a shared connection, thread A could
+                // read the `changes` thread B had just produced — and count as
+                // a success an UPDATE that wasn't its own.
                 //
-                // O sintoma era INTERMITENTE e enganoso: em 20/08/2026 a
-                // bateria reprovou 1 vez em ~10, sempre aqui, com
+                // The symptom was INTERMITTENT and misleading: on 2026-08-20
+                // the suite failed 1 run in ~10, always here, with
                 //     passaram=19   saldo=0
-                // que e' uma contradicao — 19 compras de 10 sobre 200 deixariam
-                // saldo 10, e saldo 0 significa que 20 passaram. O BANCO estava
-                // certo; o contador do teste e' que se perdeu. Um instrumento
-                // que erra as vezes reprova codigo bom e ensina a ignora-lo.
+                // which is a contradiction — 19 purchases of 10 against 200
+                // would leave a balance of 10, and a balance of 0 means 20 went
+                // through. The DATABASE was right; it was the test's counter
+                // that got lost. An instrument that's wrong sometimes fails
+                // good code and teaches you to ignore it.
                 //
-                // Com uma conexao por thread, `changes` volta a responder sobre
-                // o que ESTA thread fez — e o teste passa a medir o que diz que
-                // mede, que e' tambem o caso real: dois servidores de jogo, dois
-                // processos, duas conexoes, nenhum mutex entre eles.
+                // With one connection per thread, `changes` goes back to
+                // answering about what THIS thread did — and the test starts
+                // measuring what it says it measures, which is also the real
+                // case: two game servers, two processes, two connections, no
+                // mutex between them.
                 sqlite3* db = nullptr;
                 if (sqlite3_open_v2(g_caminho.c_str(), &db,
                                     SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) return;
