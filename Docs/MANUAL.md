@@ -404,6 +404,16 @@ showed up when somebody typed `!pontos` inside the game.
 
 ## Licence
 
-Same as Conan-Api's. You can run it on as many servers as you like, including
-servers that charge their players; and you can write and **sell** plugins of your
-own on top of the API. What you can't do is resell or re-host the API itself.
+Three different licences meet here, and it's worth being precise about which is
+which:
+
+| | licence | what it means |
+|---|---|---|
+| **Conan Shop** (this plugin) | **MIT** | copy it, change it, redistribute it, sublicense it, sell it. See the LICENSE file |
+| **Conan-Api-SDK** (the headers and examples) | **MIT** | same |
+| **Conan-Api runtime** (the loader and the .dll it ships) | its own, more restrictive licence | run it on as many servers as you like, including servers that charge their players, and write and **sell** plugins on top of it. What you can't do is resell or re-host the runtime itself |
+
+So: this shop is MIT, and nothing here restricts what you do with it. The
+restriction that exists belongs to the runtime underneath, and it doesn't reach
+the plugins written against it — that split is deliberate, and the runtime's
+LICENSE spells it out.

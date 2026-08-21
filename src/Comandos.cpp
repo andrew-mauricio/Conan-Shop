@@ -15,7 +15,7 @@
 
 namespace Shop
 {
-// Vem do ConanShop.cpp: a tabela da API e a configuracao viva. Declarados aqui
+// From ConanShop.cpp: the API table and the live configuration. Declared here
 // rather than passed as parameters, because this module is called by the
 // scheduler, which carries no context.
 extern const ConanApiTabela* ApiDaLoja();
@@ -432,7 +432,7 @@ void AtenderFila()
 
     if (respostas.empty()) return;
 
-    // ── as respostas ────────────────────────────────────────────────────────
+    // ── the answers ─────────────────────────────────────────────────────────
     //
     // Overwrites rather than accumulating: the file answers the LAST batch, and
     // whoever automates it reads that and knows it's the answer to what they

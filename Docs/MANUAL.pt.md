@@ -394,6 +394,15 @@ digitou `!pontos` dentro do jogo.
 
 ## Licença
 
-Mesma da Conan-Api. Você pode usar em quantos servidores quiser, inclusive em
-servidor que cobra dos jogadores; e pode escrever e **vender** plugins seus em
-cima da API. O que não pode é revender ou re-hospedar a própria API.
+Três licenças diferentes se encontram aqui, e vale ser preciso sobre qual é
+qual:
+
+| | licença | o que significa |
+|---|---|---|
+| **Conan Shop** (este plugin) | **MIT** | copie, altere, redistribua, sublicencie, venda. Veja o arquivo LICENSE |
+| **Conan-Api-SDK** (os headers e os exemplos) | **MIT** | idem |
+| **Conan-Api runtime** (o carregador e a .dll que ele traz) | licença própria, mais restritiva | rode em quantos servidores quiser, inclusive em servidor que cobra dos jogadores, e escreva e **venda** plugins em cima dela. O que não pode é revender ou re-hospedar o runtime |
+
+Ou seja: esta loja é MIT, e nada aqui restringe o que você faz com ela. A
+restrição que existe é do runtime embaixo, e ela não alcança os plugins escritos
+contra ele — essa separação é deliberada, e o LICENSE do runtime a detalha.
