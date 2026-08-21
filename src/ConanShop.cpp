@@ -461,7 +461,7 @@ static void ComandoDar(const Jogador& j, const std::string& resto)
     }
 
     // "<name> <amount>" — can the name contain a space? No: a Conan name is
-    // "Indio#76973", with none. Splitting on the LAST space covers both cases
+    // "Player#12345", with none. Splitting on the LAST space covers both cases
     // without needing quotes.
     const size_t esp = resto.rfind(' ');
     if (esp == std::string::npos || esp + 1 >= resto.size())
