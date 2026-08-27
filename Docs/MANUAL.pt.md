@@ -211,7 +211,7 @@ itemtable-conan.json     para programa
 itemtable-conan.csv      para planilha (com BOM: o Excel acerta o acento sozinho)
 ```
 
-Nesta build (24784646) são **9.121 itens × 120 colunas**, com `Name`,
+Medido na build 24784646, são **9.121 itens × 120 colunas**, com `Name`,
 `GUICategory`, `ItemClass`, `ItemTier`, `DLCPackage`, `MaxStackSize` e o resto.
 
 Ele **não** depende de alguém ter aberto um baú: lê a tabela, não os objetos
