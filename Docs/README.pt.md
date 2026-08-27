@@ -124,10 +124,10 @@ Em lugar disso, dois caminhos que funcionam:
 Escreva linhas em `Conan-Api/SHOP-COMANDOS`:
 
 ```
-dar     Indio#76973 500 premio do evento
-tirar   A-4QR7CRS0F 100 estorno
-definir Indio#76973 0
-saldo   Indio#76973
+dar     Player#12345 500 premio do evento
+tirar   A-EXAMPLE12 100 estorno
+definir Player#12345 0
+saldo   Player#12345
 recarregar
 ```
 
@@ -135,7 +135,7 @@ O plugin atende em até 3 segundos e responde, linha por linha, em
 `Conan-Api/SHOP-RESPOSTAS`:
 
 ```
-linha 1: ok dar A-4QR7CRS0F +500 (saldo 1250)
+linha 1: ok dar A-EXAMPLE12 +500 (saldo 1250)
 linha 2: RECUSADO tirar A-9XX -100 — saldo insuficiente (tem 40). NADA foi tirado.
 ```
 

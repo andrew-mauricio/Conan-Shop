@@ -134,12 +134,12 @@ Two paths that do work, instead:
 Write lines into `Conan-Api/SHOP-COMANDOS`:
 
 ```
-dar        Indio#76973 500 event prize
-tirar      A-4QR7CRS0F 100 refund
-definir    Indio#76973 0
-saldo      Indio#76973
-grupo      Indio#76973 vip 30
-tirargrupo Indio#76973 vip
+dar        Player#12345 500 event prize
+tirar      A-EXAMPLE12 100 refund
+definir    Player#12345 0
+saldo      Player#12345
+grupo      Player#12345 vip 30
+tirargrupo Player#12345 vip
 recarregar
 ```
 
@@ -147,7 +147,7 @@ The plugin picks it up within 3 seconds and answers, line by line, in
 `Conan-Api/SHOP-RESPOSTAS`:
 
 ```
-linha 1: ok dar A-4QR7CRS0F +500 (saldo 1250)
+linha 1: ok dar A-EXAMPLE12 +500 (saldo 1250)
 linha 2: RECUSADO tirar A-9XX -100 — saldo insuficiente (tem 40). NADA foi tirado.
 ```
 
